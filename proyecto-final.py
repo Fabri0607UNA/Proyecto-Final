@@ -1,7 +1,9 @@
 import tkinter as tk
 from tkinter import ttk  # Asegura importar ttk desde tkinter
 import cx_Oracle
-  
+
+#prueba
+
 # Función para conectar a Oracle
 def conectar_oracle(): 
     try:
