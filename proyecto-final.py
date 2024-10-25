@@ -2,11 +2,13 @@ import cx_Oracle
 import tkinter as tk
 from tkinter import ttk  # Asegura importar ttk desde tkinter
 from tkinter import messagebox
-from tkinter import simpledialog
+from tkinter import simpledialog, scrolledtext
+import subprocess
+import threading
+
 
 class Controlador:
     def __init__(self):
-        self.DRIVER = "oracle.jdbc.driver.OracleDriver"  # No se usa en cx_Oracle
         self.URL = cx_Oracle.makedsn('localhost', '1521', sid='xe')
         self.conector = None
 
@@ -363,7 +365,7 @@ class Controlador:
             return None
 
     def all_files(self):
-        query = "SELECT * FROM V$DATAFILE"
+        query = "SELECT FILE_ID, FILE_NAME, TABLESPACE_NAME FROM DBA_DATA_FILES"
         try:
             cursor = self.conector.cursor()
             cursor.execute(query)
@@ -373,7 +375,7 @@ class Controlador:
             return None
 
     def temp_files(self):
-        query = "SELECT * FROM V$TEMPFILE"
+        query = "SELECT FILE#, NAME FROM V$TEMPFILE"
         try:
             cursor = self.conector.cursor()
             cursor.execute(query)
@@ -418,14 +420,16 @@ class Controlador:
 
 
     def tam_bd(self):
-        query = "SELECT SUM(BYTES)/1024/1024 MB FROM DBA_EXTENTS"
+        query = "SELECT SUM(BYTES)/1024/1024 AS MB FROM DBA_EXTENTS"
         try:
             cursor = self.conector.cursor()
             cursor.execute(query)
-            return cursor
+            result = cursor.fetchone()  # Obtener el primer resultado
+            return result  # Retornar el resultado en lugar del cursor
         except cx_Oracle.Error as e:
             print(f"Error al obtener tamaño de BD: {e}")
             return None
+
 
     def tam_files_bd(self):
         query = "SELECT SUM(bytes)/1024/1024 MB FROM dba_data_files"
@@ -498,8 +502,8 @@ class Controlador:
 
     def obtener_explain_plan(self):
         query = """
-        SELECT SUBSTR(LPAD(' ', LEVEL-1) || OPERATION || ' (' || OPTIONS|| ')', 1, 30) OPERACION,
-               OBJECT_NAME OBJETO, TIMESTAMP FECHA
+        SELECT SUBSTR(LPAD(' ', LEVEL-1) || OPERATION || ' (' || OPTIONS|| ')', 1, 30) AS OPERACION,
+               OBJECT_NAME AS OBJETO, TIMESTAMP AS FECHA
         FROM PLAN_TABLE
         START WITH ID = 0
         CONNECT BY PRIOR ID=PARENT_ID
@@ -507,7 +511,9 @@ class Controlador:
         try:
             cursor = self.conector.cursor()
             cursor.execute(query)
-            return cursor
+            plan = cursor.fetchall()  # Obtén todas las filas como lista de tuplas
+            cursor.close()
+            return plan
         except cx_Oracle.Error as e:
             print(f"Error al obtener explain plan: {e}")
             return None
@@ -657,7 +663,7 @@ class Controlador:
 class OracleDBManager:
     def __init__(self, root):
         self.root = root
-        self.root.title("Oracle Database Manager")
+        self.root.title("Administrador de Base de Datos Oracle")
         self.root.geometry("800x600")
         
         self.controlador = Controlador()
@@ -668,17 +674,17 @@ class OracleDBManager:
         self.login_frame = ttk.Frame(self.root, padding="20")
         self.login_frame.pack(expand=True, fill="both")
 
-        ttk.Label(self.login_frame, text="Username:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        ttk.Label(self.login_frame, text="Usuario:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
         self.username_entry = ttk.Entry(self.login_frame)
         self.username_entry.grid(row=0, column=1, padx=5, pady=5)
 
-        ttk.Label(self.login_frame, text="Password:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        ttk.Label(self.login_frame, text="Contraseña:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
         self.password_entry = ttk.Entry(self.login_frame, show="*")
         self.password_entry.grid(row=1, column=1, padx=5, pady=5)
 
-        ttk.Button(self.login_frame, text="Connect", command=self.connect).grid(row=2, column=0, columnspan=2, pady=10)
+        ttk.Button(self.login_frame, text="Conectar", command=self.connect).grid(row=2, column=0, columnspan=2, pady=10)
 
-        self.status_label = ttk.Label(self.login_frame, text="Status: Disconnected", foreground="red")
+        self.status_label = ttk.Label(self.login_frame, text="Estado: Desconectado", foreground="red")
         self.status_label.grid(row=3, column=0, columnspan=2)
 
     def connect(self):
@@ -686,11 +692,11 @@ class OracleDBManager:
         password = self.password_entry.get()
         
         if self.controlador.get_conexion(username, password):
-            self.status_label.config(text="Status: Connected", foreground="green")
+            self.status_label.config(text="Estado: Conectado", foreground="green")
             self.login_frame.destroy()
             self.create_main_interface()
         else:
-            messagebox.showerror("Connection Error", "Failed to connect to the database.")
+            messagebox.showerror("Error de Conexión", "No se pudo conectar a la base de datos.")
 
     def create_main_interface(self):
         self.notebook = ttk.Notebook(self.root)
@@ -704,220 +710,366 @@ class OracleDBManager:
         self.create_auditing_tab()
         self.create_database_info_tab()
 
-        ttk.Button(self.root, text="Disconnect", command=self.disconnect).pack(pady=10)
+        ttk.Button(self.root, text="Desconectar", command=self.disconnect).pack(pady=10)
 
     def create_user_management_tab(self):
         tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="User Management")
+        self.notebook.add(tab, text="Gestión de Usuarios")
 
-        ttk.Button(tab, text="Create User", command=self.create_user).pack(pady=5)
-        ttk.Button(tab, text="Create Role", command=self.create_role).pack(pady=5)
-        ttk.Button(tab, text="Grant Role to User", command=self.grant_role_to_user).pack(pady=5)
-        ttk.Button(tab, text="Revoke Role from User", command=self.revoke_role_from_user).pack(pady=5)
-        ttk.Button(tab, text="View User Roles", command=self.view_user_roles).pack(pady=5)
+        ttk.Button(tab, text="Crear Usuario", command=self.create_user).pack(pady=5)
+        ttk.Button(tab, text="Crear Rol", command=self.create_role).pack(pady=5)
+        ttk.Button(tab, text="Otorgar Rol a Usuario", command=self.grant_role_to_user).pack(pady=5)
+        ttk.Button(tab, text="Revocar Rol de Usuario", command=self.revoke_role_from_user).pack(pady=5)
+        ttk.Button(tab, text="Ver Roles de Usuario", command=self.view_user_roles).pack(pady=5)
 
     def create_session_management_tab(self):
         tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="Session Management")
+        self.notebook.add(tab, text="Gestión de Sesiones")
 
-        ttk.Button(tab, text="View Active Sessions", command=self.view_active_sessions).pack(pady=5)
-        ttk.Button(tab, text="Kill Session", command=self.kill_session).pack(pady=5)
+        ttk.Button(tab, text="Ver Sesiones Activas", command=self.view_active_sessions).pack(pady=5)
+        ttk.Button(tab, text="Terminar Sesión", command=self.kill_session).pack(pady=5)
 
     def create_tablespace_management_tab(self):
         tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="Tablespace Management")
+        self.notebook.add(tab, text="Gestión de Tablespaces")
 
-        ttk.Button(tab, text="View Tablespaces", command=self.view_tablespaces).pack(pady=5)
-        ttk.Button(tab, text="Create Tablespace", command=self.create_tablespace).pack(pady=5)
-        ttk.Button(tab, text="Drop Tablespace", command=self.drop_tablespace).pack(pady=5)
+        ttk.Button(tab, text="Ver Tablespaces", command=self.view_tablespaces).pack(pady=5)
+        ttk.Button(tab, text="Crear Tablespace", command=self.create_tablespace).pack(pady=5)
+        ttk.Button(tab, text="Eliminar Tablespace", command=self.drop_tablespace).pack(pady=5)
 
     def create_backup_tab(self):
         tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="Backup & Recovery")
+        self.notebook.add(tab, text="Respaldo y Recuperación")
 
-        ttk.Button(tab, text="Backup Schema", command=lambda: self.backup("schema")).pack(pady=5)
-        ttk.Button(tab, text="Backup Table", command=lambda: self.backup("table")).pack(pady=5)
-        ttk.Button(tab, text="Full Backup", command=lambda: self.backup("full")).pack(pady=5)
-        ttk.Button(tab, text="Restore Backup", command=self.restore_backup).pack(pady=5)
-
+        ttk.Button(tab, text="Respaldo de Esquema", command=lambda: self.backup("schema")).pack(pady=5)
+        ttk.Button(tab, text="Respaldo de Tabla", command=lambda: self.backup("table")).pack(pady=5)
+        ttk.Button(tab, text="Respaldo Completo", command=lambda: self.backup("full")).pack(pady=5)
+        ttk.Button(tab, text="Restaurar Respaldo", command=self.restore_backup).pack(pady=5)
+        
     def create_query_optimization_tab(self):
         tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="Query Optimization")
+        self.notebook.add(tab, text="Optimización de Consultas")
 
-        ttk.Button(tab, text="Analyze Query", command=self.analyze_query).pack(pady=5)
-        ttk.Button(tab, text="View Execution Plan", command=self.view_execution_plan).pack(pady=5)
-        ttk.Button(tab, text="Generate Table Statistics", command=self.generate_table_statistics).pack(pady=5)
+        ttk.Button(tab, text="Analizar Consulta", command=self.analyze_query).pack(pady=5)
+        ttk.Button(tab, text="Ver Plan de Ejecución", command=self.view_execution_plan).pack(pady=5)
+        ttk.Button(tab, text="Generar Estadísticas de Tabla", command=self.generate_table_statistics).pack(pady=5)
 
     def create_auditing_tab(self):
         tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="Auditing")
+        self.notebook.add(tab, text="Auditoría")
 
-        ttk.Button(tab, text="Enable Connection Auditing", command=self.controlador.auditar_conexiones).pack(pady=5)
-        ttk.Button(tab, text="Enable Session Auditing", command=self.controlador.auditar_inicios_sesion).pack(pady=5)
-        ttk.Button(tab, text="View Audit Trail", command=self.view_audit_trail).pack(pady=5)
+        ttk.Button(tab, text="Habilitar Auditoría de Conexiones", command=self.controlador.auditar_conexiones).pack(pady=5)
+        ttk.Button(tab, text="Habilitar Auditoría de Sesiones", command=self.controlador.auditar_inicios_sesion).pack(pady=5)
+        ttk.Button(tab, text="Ver Registro de Auditoría", command=self.view_audit_trail).pack(pady=5)
 
     def create_database_info_tab(self):
         tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="Database Info")
+        self.notebook.add(tab, text="Información de la Base de Datos")
 
-        ttk.Button(tab, text="View Instance Info", command=self.view_instance_info).pack(pady=5)
-        ttk.Button(tab, text="View Database Size", command=self.view_database_size).pack(pady=5)
-        ttk.Button(tab, text="View Data Files", command=self.view_data_files).pack(pady=5)
+        ttk.Button(tab, text="Ver Información de la Instancia", command=self.view_instance_info).pack(pady=5)
+        ttk.Button(tab, text="Ver Tamaño de la Base de Datos", command=self.view_database_size).pack(pady=5)
+        ttk.Button(tab, text="Ver Archivos de Datos", command=self.view_data_files).pack(pady=5)
 
     # User Management Methods
     def create_user(self):
-        username = simpledialog.askstring("Create User", "Enter new username:")
+        username = simpledialog.askstring("Crear Usuario", "Ingrese el nuevo nombre de usuario:")
         if username and self.controlador.crear_usuario(username):
-            messagebox.showinfo("Success", f"User {username} created successfully.")
+            messagebox.showinfo("Éxito", f"Usuario {username} creado exitosamente.")
         else:
-            messagebox.showerror("Error", "Failed to create user.")
+            messagebox.showerror("Error", "No se pudo crear el usuario.")
 
     def create_role(self):
-        role = simpledialog.askstring("Create Role", "Enter new role name:")
+        role = simpledialog.askstring("Crear Rol", "Ingrese el nuevo nombre del rol:")
         if role and self.controlador.crear_rol(role):
-            messagebox.showinfo("Success", f"Role {role} created successfully.")
+            messagebox.showinfo("Éxito", f"Rol {role} creado exitosamente.")
         else:
-            messagebox.showerror("Error", "Failed to create role.")
+            messagebox.showerror("Error", "No se pudo crear el rol.")
 
     def grant_role_to_user(self):
-        user = simpledialog.askstring("Grant Role", "Enter username:")
-        role = simpledialog.askstring("Grant Role", "Enter role name:")
+        user = simpledialog.askstring("Otorgar Rol", "Ingrese el nombre de usuario:")
+        role = simpledialog.askstring("Otorgar Rol", "Ingrese el nombre del rol:")
         if user and role and self.controlador.otorgar_rol_usuario(role, user):
-            messagebox.showinfo("Success", f"Role {role} granted to user {user}.")
+            messagebox.showinfo("Éxito", f"Rol {role} otorgado al usuario {user}.")
         else:
-            messagebox.showerror("Error", "Failed to grant role.")
+            messagebox.showerror("Error", "No se pudo otorgar el rol.")
 
     def revoke_role_from_user(self):
-        user = simpledialog.askstring("Revoke Role", "Enter username:")
-        role = simpledialog.askstring("Revoke Role", "Enter role name:")
+        user = simpledialog.askstring("Revocar Rol", "Ingrese el nombre de usuario:")
+        role = simpledialog.askstring("Revocar Rol", "Ingrese el nombre del rol:")
         if user and role and self.controlador.revocar_rol_usuario(role, user):
-            messagebox.showinfo("Success", f"Role {role} revoked from user {user}.")
+            messagebox.showinfo("Éxito", f"Rol {role} revocado del usuario {user}.")
         else:
-            messagebox.showerror("Error", "Failed to revoke role.")
+            messagebox.showerror("Error", "No se pudo revocar el rol.")
 
     def view_user_roles(self):
-        user = simpledialog.askstring("View Roles", "Enter username:")
+        user = simpledialog.askstring("Ver Roles", "Ingrese el nombre de usuario:")
         if user:
             roles = self.controlador.cargar_roles(user)
             if roles:
                 role_list = "\n".join([row[0] for row in roles])
-                messagebox.showinfo("User Roles", f"Roles for {user}:\n{role_list}")
+                messagebox.showinfo("Roles del Usuario", f"Roles para {user}:\n{role_list}")
             else:
-                messagebox.showinfo("User Roles", f"No roles found for {user}")
+                messagebox.showinfo("Roles del Usuario", f"No se encontraron roles para {user}")
 
     # Session Management Methods
     def view_active_sessions(self):
         sessions = self.controlador.cargar_sesiones_bd()
         if sessions:
-            session_list = "\n".join([f"SID: {row[0]}, Serial#: {row[1]}, Username: {row[2]}, Program: {row[3]}" for row in sessions])
-            messagebox.showinfo("Active Sessions", session_list)
+            session_list = "\n".join([f"SID: {row[0]}, Serial#: {row[1]}, Usuario: {row[2]}, Programa: {row[3]}" for row in sessions])
+            messagebox.showinfo("Sesiones Activas", session_list)
         else:
-            messagebox.showinfo("Active Sessions", "No active sessions found")
+            messagebox.showinfo("Sesiones Activas", "No se encontraron sesiones activas")
 
     def kill_session(self):
-        sid = simpledialog.askstring("Kill Session", "Enter SID:")
-        serial = simpledialog.askstring("Kill Session", "Enter Serial#:")
+        sid = simpledialog.askstring("Terminar Sesión", "Ingrese SID:")
+        serial = simpledialog.askstring("Terminar Sesión", "Ingrese Serial#:")
         if sid and serial:
             if self.controlador.cerrar_sesion_bd(sid, serial, 1):
-                messagebox.showinfo("Success", f"Session {sid},{serial} killed successfully.")
+                messagebox.showinfo("Éxito", f"Sesión {sid},{serial} terminada exitosamente.")
             else:
-                messagebox.showerror("Error", "Failed to kill session.")
+                messagebox.showerror("Error", "No se pudo terminar la sesión.")
 
     # Tablespace Management Methods
     def view_tablespaces(self):
         tablespaces = self.controlador.tam_tablespaces()
         if tablespaces:
-            ts_list = "\n".join([f"{row[0]}: {row[2]}MB total, {row[3]}MB used, {row[4]}MB free" for row in tablespaces])
+            ts_list = "\n".join([f"{row[0]}: {row[2]}MB total, {row[3]}MB usados, {row[4]}MB libres" for row in tablespaces])
             messagebox.showinfo("Tablespaces", ts_list)
         else:
-            messagebox.showinfo("Tablespaces", "No tablespaces found")
+            messagebox.showinfo("Tablespaces", "No se encontraron tablespaces")
 
     def create_tablespace(self):
         # This method would require additional implementation to create tablespaces
-        messagebox.showinfo("Info", "Tablespace creation not implemented in this version.")
+        messagebox.showinfo("Info", "Creación de tablespace no implementada en esta versión.")
 
     def drop_tablespace(self):
         # This method would require additional implementation to drop tablespaces
-        messagebox.showinfo("Info", "Tablespace dropping not implemented in this version.")
+        messagebox.showinfo("Info", "Eliminación de tablespace no implementada en esta versión.")
 
-    # Backup & Recovery Methods
     def backup(self, backup_type):
-        # This method would require additional implementation to perform backups
-        messagebox.showinfo("Info", f"{backup_type.capitalize()} backup not implemented in this version.")
+        try:
+            if backup_type == "schema":
+                schema = simpledialog.askstring("Respaldo de Esquema", "Ingrese el nombre del esquema:")
+                dumpfile = f'{schema}_respaldo.dmp'
+                logfile = f'{schema}_respaldo.log'
+                if schema:
+                    result = f"expdp 'sys/root@XE as sysdba' schemas={schema} directory=respaldo dumpfile={dumpfile} logfile={logfile}"
+                else:
+                    messagebox.showerror("Error", "El nombre del esquema es requerido.")
+                    return
+            elif backup_type == "table":
+                schema = simpledialog.askstring("Respaldo de Tabla", "Ingrese el nombre del esquema:")
+                table = simpledialog.askstring("Respaldo de Tabla", "Ingrese el nombre de la tabla:")
+                dumpfile = f'{schema}.{table}_respaldo.dmp'
+                logfile = f'{schema}.{table}_respaldo.log'
+                if schema and table:
+                    result = f"expdp 'sys/root@XE as sysdba' tables={schema}.{table} directory=respaldo dumpfile={dumpfile} logfile={logfile}"
+                else:
+                    messagebox.showerror("Error", "Los nombres del esquema y la tabla son requeridos.")
+                    return
+            elif backup_type == "full":
+                result = f"expdp 'sys/root@XE as sysdba' full=y directory=respaldo dumpfile={dumpfile} logfile={logfile}"
+
+            # Crear una ventana nueva para mostrar la salida
+            output_window = tk.Toplevel(self.root)
+            output_window.title("Salida del Respaldo")
+            output_text = scrolledtext.ScrolledText(output_window, width=80, height=20)
+            output_text.pack(padx=10, pady=10)
+
+            # Función para leer la salida del proceso en tiempo real
+            def run_backup():
+                process = subprocess.Popen(result, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                for line in iter(process.stdout.readline, ''):
+                    output_text.insert(tk.END, line)
+                    output_text.see(tk.END)  # Scroll hacia el final
+                process.stdout.close()
+                
+                # Mostrar cualquier mensaje de error
+                error_output = process.stderr.read()
+                if error_output:
+                    output_text.insert(tk.END, f"\nError:\n{error_output}")
+                process.stderr.close()
+                process.wait()  # Asegurarse de que el proceso haya terminado
+
+                # Verificar si el proceso terminó sin errores
+                if process.returncode == 0:
+                    messagebox.showinfo("Respaldo completo", f"Respaldo {backup_type} realizado correctamente en {dumpfile}")
+                else:
+                    messagebox.showerror("Error", f"Error al realizar el respaldo:\n{error_output}")
+
+            # Ejecutar el respaldo en un hilo separado para no bloquear la GUI
+            threading.Thread(target=run_backup).start()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Ocurrió un error: {e}")
 
     def restore_backup(self):
-        # This method would require additional implementation to restore backups
-        messagebox.showinfo("Info", "Backup restoration not implemented in this version.")
+        # Este método requeriría implementación adicional para restaurar respaldos
+        messagebox.showinfo("Info", "Restauración de respaldo no implementada en esta versión.")
 
-    # Query Optimization Methods
+    # Métodos de Optimización de Consultas
     def analyze_query(self):
-        query = simpledialog.askstring("Analyze Query", "Enter SQL query:")
+        query = simpledialog.askstring("Analizar Consulta", "Ingrese la consulta SQL:")
         if query:
             result = self.controlador.executar_query_optimizar(query)
             if result == "true":
-                messagebox.showinfo("Success", "Query analyzed successfully.")
+                messagebox.showinfo("Éxito", "Consulta analizada exitosamente.")
             else:
-                messagebox.showerror("Error", f"Failed to analyze query: {result}")
+                messagebox.showerror("Error", f"Error al analizar la consulta: {result}")
 
     def view_execution_plan(self):
         plan = self.controlador.obtener_explain_plan()
         if plan:
             plan_text = "\n".join([f"{row[0]} - {row[1]} ({row[2]})" for row in plan])
-            messagebox.showinfo("Execution Plan", plan_text)
+            messagebox.showinfo("Plan de Ejecución", plan_text)
         else:
-            messagebox.showinfo("Execution Plan", "No execution plan available.")
+            messagebox.showinfo("Plan de Ejecución", "No hay plan de ejecución disponible.")
 
     def generate_table_statistics(self):
-        schema = simpledialog.askstring("Generate Statistics", "Enter schema name:")
-        table = simpledialog.askstring("Generate Statistics", "Enter table name (or 'Schema' for all tables):")
+        schema = simpledialog.askstring("Generar Estadísticas", "Ingrese el nombre del esquema:")
+        table = simpledialog.askstring("Generar Estadísticas", "Ingrese el nombre de la tabla (o 'Schema' para todas las tablas):")
         if schema and table:
             if self.controlador.genera_stats(schema, table):
-                messagebox.showinfo("Success", "Statistics generated successfully.")
-                messagebox.showinfo(self.controlador.consulta_stats(self, table))
+                messagebox.showinfo("Éxito", "Estadísticas generadas exitosamente.")
+                stats = self.controlador.consulta_stats(table)  # Obtener los resultados de la consulta
+                if stats:  # Verifica si hay resultados
+                    result_message = "Estadísticas:\n"
+                    for row in stats:  # Iterar sobre los resultados
+                        result_message += f"Propietario: {row[0]}, Nombre de Tabla: {row[1]}, Número de Filas: {row[2]}, Último Análisis: {row[3]}\n"
+                    messagebox.showinfo("Información de Estadísticas", result_message)  # Mostrar estadísticas
+                else:
+                    messagebox.showerror("Error", "No se encontraron estadísticas.")
             else:
-                messagebox.showerror("Error", "Failed to generate statistics.")
+                messagebox.showerror("Error", "Error al generar estadísticas.")
 
-    # Auditing Methods
+    # Métodos de Auditoría
     def view_audit_trail(self):
         audit_trail = self.controlador.ver_auditoria_por_accion()
-        if audit_trail:
-            trail_text = "\n".join([f"{row[0]} - {row[1]} - {row[2]} - {row[3]} on {row[4]}" for row in audit_trail])
-            messagebox.showinfo("Audit Trail", trail_text)
-        else:
-            messagebox.showinfo("Audit Trail", "No audit trail available.")
+        sesiones = self.controlador.visualizar_auditoria_sesiones()  # Obtener auditoría de sesiones
 
-    # Database Info Methods
+        trail_text = ""
+
+        # Procesar la auditoría de acciones
+        if audit_trail:
+            trail_text += "\nAcciones:\n" + "\n".join([f"{row[0]} - {row[1]} - {row[2]} - {row[3]} en {row[4]}" for row in audit_trail]) + "\n"
+        else:
+            trail_text += "No hay auditoría disponible para acciones.\n"
+
+        # Procesar la auditoría de sesiones
+        if sesiones:
+            trail_text += "Sesiones:\n" + "\n".join([f"{row[0]} - {row[1]} - {row[2]} - {row[3]}" for row in sesiones])
+        else:
+            trail_text += "No hay auditoría disponible para sesiones."
+
+        # Mostrar mensaje con los resultados combinados
+        messagebox.showinfo("Auditoría", trail_text)
+
+    # Métodos de Información de la Base de Datos
     def view_instance_info(self):
         info = self.controlador.info_instancia()
         if info:
             info_text = "\n".join([f"{row[0]}: {row[1]}" for row in info])
-            messagebox.showinfo("Instance Info", info_text)
+            messagebox.showinfo("Información de la Instancia", info_text)
         else:
-            messagebox.showinfo("Instance Info", "No instance information available.")
+            messagebox.showinfo("Información de la Instancia", "No hay información de la instancia disponible.")
 
     def view_database_size(self):
         size = self.controlador.tam_bd()
-        if size:
-            messagebox.showinfo("Database Size", f"Total size: {size[0][0]:.2f} MB")
+        if size and size[0] is not None:  # Verificamos que size no sea None y que el primer elemento no sea None
+            messagebox.showinfo("Tamaño de la Base de Datos", f"Tamaño total: {size[0]:.2f} MB")
         else:
-            messagebox.showinfo("Database Size", "Unable to retrieve database size.")
+            messagebox.showinfo("Tamaño de la Base de Datos", "No se pudo obtener el tamaño de la base de datos.")
 
     def view_data_files(self):
-        files = self.controlador.all_files()
-        if files:
-            file_text = "\n".join([f"{row[0]}: {row[1]}" for row in files])
-            messagebox.showinfo("Data Files", file_text)
+        # Obtener archivos de datos
+        data_files = self.controlador.all_files()
+        # Obtener archivos temporales
+        temp_files = self.controlador.temp_files()
+        # Obtener archivos de redo log
+        redo_log_files = self.controlador.redo_log_files()
+    
+        # Preparar texto para mostrar
+        file_text = "Archivos de Datos:\n"
+        if data_files:
+            file_text += "\n".join([f"{row[0]}: {row[1]}" for row in data_files]) + "\n"
         else:
-            messagebox.showinfo("Data Files", "No data files found.")
+            file_text += "No se encontraron archivos de datos.\n"
+
+        file_text += "\nArchivos Temporales:\n"
+        if temp_files:
+            file_text += "\n".join([f"{row[0]}: {row[1]}" for row in temp_files]) + "\n"
+        else:
+            file_text += "No se encontraron archivos temporales.\n"
+
+        file_text += "\nArchivos de Redo Log:\n"
+        if redo_log_files:
+            file_text += "\n".join([f"{row[0]}" for row in redo_log_files]) + "\n"
+        else:
+            file_text += "No se encontraron archivos de redo log.\n"
+
+        # Mostrar el mensaje combinado
+        messagebox.showinfo("Archivos del Sistema", file_text)
 
     def disconnect(self):
-        # Close the connection and return to the login screen
+        # Cerrar la conexión y volver a la pantalla de inicio de sesión
         self.controlador.conector.close()
         for widget in self.root.winfo_children():
             widget.destroy()
         self.create_login_frame()
 
+    # Añadir contenido a la pestaña de "Respaldos"
+    def agregar_funcionalidad_respaldo(tab_respaldos):
+        tk.Label(tab_respaldos, text="Seleccione el tipo de respaldo:").pack(pady=10)
+
+        # Funciones de respaldo
+        def crear_respaldo(tipo):
+            if tipo == "schema":
+                esquema = simpledialog.askstring("Esquema", "Ingrese el nombre del esquema:")
+                resultado = ejecutar_expdp("schema", esquema=esquema)
+            elif tipo == "tabla":
+                esquema = simpledialog.askstring("Esquema", "Ingrese el nombre del esquema:")
+                tabla = simpledialog.askstring("Tabla", "Ingrese el nombre de la tabla:")
+                resultado = ejecutar_expdp("tabla", esquema=esquema, tabla=tabla)
+            elif tipo == "full":
+                resultado = ejecutar_expdp("full")
+
+            messagebox.showinfo("Resultado del Respaldo", resultado)
+
+        # Botones para cada tipo de respaldo
+        btn_schema = tk.Button(tab_respaldos, text="Respaldo por Schema", command=lambda: crear_respaldo("schema"))
+        btn_schema.pack(pady=5)
+
+        btn_tabla = tk.Button(tab_respaldos, text="Respaldo por Tabla", command=lambda: crear_respaldo("tabla"))
+        btn_tabla.pack(pady=5)
+
+        btn_full = tk.Button(tab_respaldos, text="Respaldo Full", command=lambda: crear_respaldo("full"))
+        btn_full.pack(pady=5)
+
+    # Función para ejecutar el comando expdp
+def ejecutar_expdp(tipo_respaldo, esquema=None, tabla=None):
+    try:
+        dumpfile = f'{tipo_respaldo}_backup.dmp'
+        logfile = f'{tipo_respaldo}_backup.log'
+        if tipo_respaldo == "schema" and esquema:
+            command = f"expdp system/password schemas={esquema} dumpfile={dumpfile} logfile={logfile}"
+        elif tipo_respaldo == "tabla" and esquema and tabla:
+            command = f"expdp system/password tables={esquema}.{tabla} dumpfile={dumpfile} logfile={logfile}"
+        elif tipo_respaldo == "full":
+            command = f"expdp system/password full=y dumpfile={dumpfile} logfile={logfile}"
+        else:
+            return "Tipo de respaldo inválido"
+        # Ejecutar el comando expdp
+        subprocess.run(command, shell=True, check=True)
+        return f"Respaldo {tipo_respaldo} realizado correctamente en {dumpfile}"
+    except subprocess.CalledProcessError as e:
+        return f"Error al realizar respaldo: {e}"
+
 if __name__ == "__main__":
     root = tk.Tk()
     app = OracleDBManager(root)
     root.mainloop()
+import subprocess
+import tkinter as tk
+from tkinter import ttk, messagebox, simpledialog
+
+
