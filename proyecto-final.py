@@ -659,6 +659,18 @@ class Controlador:
         except cx_Oracle.Error as e:
             print(f"Error al crear índice: {e}")
             return False
+    
+    def borrar_tablespace(self, nombre_tablespace):
+        query = f"DROP TABLESPACE {nombre_tablespace} INCLUDING CONTENTS AND DATAFILES"
+        try:
+            cursor = self.conector.cursor()
+            cursor.execute(query)
+            self.conector.commit()
+            print(f"Tablespace '{nombre_tablespace}' ha sido eliminado con éxito.")
+            return True
+        except cx_Oracle.Error as e:
+            print(f"Error al borrar el tablespace: {e}")
+            return False
 
 class OracleDBManager:
     def __init__(self, root):
@@ -672,25 +684,35 @@ class OracleDBManager:
 
     def create_login_frame(self):
         self.login_frame = ttk.Frame(self.root, padding="20")
-        self.login_frame.pack(expand=True, fill="both")
+        self.login_frame.place(relx=0.5, rely=0.4, anchor="center")
 
-        ttk.Label(self.login_frame, text="Usuario:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        title_label = ttk.Label(self.login_frame, text="Iniciar Sesión", font=("Tahoma", 16, "bold"))
+        title_label.grid(row=0, column=0, columnspan=2, pady=(0, 15), padx=(24, 0))
+
+        ttk.Label(self.login_frame, text="Usuario:", font=("Tahoma", 12)).grid(row=1, column=0, padx=5, pady=5, sticky="e")
         self.username_entry = ttk.Entry(self.login_frame)
-        self.username_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.username_entry.grid(row=1, column=1, padx=5, pady=5)
 
-        ttk.Label(self.login_frame, text="Contraseña:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        ttk.Label(self.login_frame, text="Contraseña:", font=("Tahoma", 12)).grid(row=2, column=0, padx=5, pady=5, sticky="e")
         self.password_entry = ttk.Entry(self.login_frame, show="*")
-        self.password_entry.grid(row=1, column=1, padx=5, pady=5)
+        self.password_entry.grid(row=2, column=1, padx=5, pady=5)
 
-        ttk.Button(self.login_frame, text="Conectar", command=self.connect).grid(row=2, column=0, columnspan=2, pady=10)
+        style = ttk.Style()
+        style.configure("TButton", font=("Tahoma", 10))
 
-        self.status_label = ttk.Label(self.login_frame, text="Estado: Desconectado", foreground="red")
-        self.status_label.grid(row=3, column=0, columnspan=2)
+        ttk.Button(self.login_frame, text="Conectar", command=self.connect, width=15, style="TButton").grid(row=3, column=0, columnspan=2, pady=15, padx=(15,0))
+
+        self.status_label = ttk.Label(self.login_frame, text="Estado: Desconectado", foreground="red", font=("Tahoma", 10))
+        self.status_label.grid(row=4, column=0, columnspan=2, padx=(12,0))
 
     def connect(self):
         username = self.username_entry.get()
         password = self.password_entry.get()
         
+        if not username or not password:
+            messagebox.showerror("Error de Conexión", "Por favor ingrese un usuario y una contraseña.")
+            return 
+
         if self.controlador.get_conexion(username, password):
             self.status_label.config(text="Estado: Conectado", foreground="green")
             self.login_frame.destroy()
@@ -843,8 +865,13 @@ class OracleDBManager:
         messagebox.showinfo("Info", "Creación de tablespace no implementada en esta versión.")
 
     def drop_tablespace(self):
-        # This method would require additional implementation to drop tablespaces
-        messagebox.showinfo("Info", "Eliminación de tablespace no implementada en esta versión.")
+        nombre_tablespace = simpledialog.askstring("Eliminar Tablespace", "Ingrese el nombre del tablespace a eliminar:")
+
+        if nombre_tablespace:
+            if self.controlador.borrar_tablespace(nombre_tablespace):
+                messagebox.showinfo("Éxito", f"Tablespace '{nombre_tablespace}' eliminado correctamente.")
+            else:
+                messagebox.showerror("Error", "No se pudo eliminar el tablespace.")
 
     def backup(self, backup_type):
         try:
