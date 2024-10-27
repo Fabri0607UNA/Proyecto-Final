@@ -5,6 +5,7 @@ from tkinter import messagebox
 from tkinter import simpledialog, scrolledtext
 import subprocess
 import threading
+import logging
 
 
 class Controlador:
@@ -685,6 +686,75 @@ class Controlador:
         except cx_Oracle.Error as e:
             print(f"Error al cambiar el tamaño del tablespace: {e}")
             return False
+        
+    def crear_tablespace(self, nombre_tablespace: str, tamano: str, tipo: str = "normal") -> bool:
+        cursor = None
+        try:
+            # Validaciones de entrada
+            if not isinstance(nombre_tablespace, str) or not nombre_tablespace.strip():
+                logging.error("El nombre del tablespace no puede estar vacío")
+                return False
+
+            if not isinstance(tamano, str) or not tamano.strip():
+                logging.error("El tamaño no puede estar vacío")
+                return False
+
+            # Validar formato del tamaño con expresión regular
+            import re
+            if not re.match(r'^\d+[MG]$', tamano):
+                logging.error("El tamaño debe estar en formato válido (ejemplo: 100M o 1G)")
+                return False
+
+            # Validar tipo de tablespace
+            tipo = tipo.lower()
+            if tipo not in ["normal", "temporal"]:
+                logging.error("El tipo de tablespace debe ser 'normal' o 'temporal'")
+                return False
+
+            # Construir ruta del archivo
+            import os
+            directorio_base = "C:\\ORACLE_FILES"
+            if not os.path.exists(directorio_base):
+                os.makedirs(directorio_base)
+            
+            ruta_archivo = os.path.join(directorio_base, f"{nombre_tablespace}.dbf")
+
+            cursor = self.conector.cursor()
+            
+            # Habilitar Oracle Script
+            cursor.execute('ALTER SESSION SET "_ORACLE_SCRIPT" = TRUE')
+
+            # Construir y ejecutar la consulta SQL
+            sql = (
+                f"""CREATE {'TEMPORARY ' if tipo == 'temporal' else ''}TABLESPACE "{nombre_tablespace}" 
+                {'TEMPFILE' if tipo == 'temporal' else 'DATAFILE'} '{ruta_archivo}' 
+                SIZE {tamano} 
+                {' AUTOEXTEND ON' if tipo == 'temporal' else ' ONLINE'}"""
+            )
+
+            logging.info(f"Ejecutando SQL: {sql}")
+            cursor.execute(sql)
+            self.conector.commit()
+            
+            logging.info(f"Tablespace '{nombre_tablespace}' creado exitosamente")
+            return True
+
+        except cx_Oracle.DatabaseError as e:
+            error_obj, = e.args
+            error_mensaje = f"Error al crear el tablespace: {error_obj.message}"
+            logging.error(error_mensaje)
+            messagebox.showerror("Error", error_mensaje)
+            return False
+
+        except Exception as e:
+            error_mensaje = f"Error inesperado al crear el tablespace: {str(e)}"
+            logging.error(error_mensaje)
+            messagebox.showerror("Error", error_mensaje)
+            return False
+
+        finally:
+            if cursor:
+                cursor.close()
 
 class OracleDBManager:
     def __init__(self, root):
@@ -770,7 +840,7 @@ class OracleDBManager:
         self.notebook.add(tab, text="Gestión de Tablespaces")
 
         ttk.Button(tab, text="Ver Tablespaces", command=self.view_tablespaces).pack(pady=5)
-        ttk.Button(tab, text="Crear Tablespace", command=self.create_tablespace).pack(pady=5)
+        ttk.Button(tab, text="Crear Tablespace", command=self.crear_tablespace).pack(pady=5)
         ttk.Button(tab, text="Eliminar Tablespace", command=self.drop_tablespace).pack(pady=5)
         ttk.Button(tab, text="Cambiar Tamaño Tablespace", command=self.resize_tablespace).pack(pady=5)
     
@@ -876,9 +946,58 @@ class OracleDBManager:
         else:
             messagebox.showinfo("Tablespaces", "No se encontraron tablespaces")
 
-    def create_tablespace(self):
-        # This method would require additional implementation to create tablespaces
-        messagebox.showinfo("Info", "Creación de tablespace no implementada en esta versión.")
+    def crear_tablespace(self):
+        # Crear el diálogo de entrada
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Crear Tablespace")
+
+        # Entradas para nombre del tablespace y tamaño
+        tk.Label(dialog, text="Ingrese el nombre del tablespace:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=10)
+        nombre_tablespace_entry = tk.Entry(dialog)
+        nombre_tablespace_entry.grid(row=0, column=1, padx=10, pady=10)
+
+        tk.Label(dialog, text="Ingrese el tamaño (ejemplo: 100M):", font=("Tahoma", 10)).grid(row=1, column=0, padx=10, pady=10)
+        nuevo_tamano_entry = tk.Entry(dialog)
+        nuevo_tamano_entry.grid(row=1, column=1, padx=10, pady=10)
+
+        # Selección del tipo de tablespace
+        tk.Label(dialog, text="Tipo de Tablespace:", font=("Tahoma", 10)).grid(row=2, column=0, padx=10, pady=10)
+        tipo_tablespace_var = tk.StringVar(value="normal")
+        tipo_tablespace_normal = tk.Radiobutton(dialog, text="Normal", variable=tipo_tablespace_var, value="normal")
+        tipo_tablespace_normal.grid(row=2, column=1, padx=10, pady=5, sticky="w")
+        tipo_tablespace_temporal = tk.Radiobutton(dialog, text="Temporal", variable=tipo_tablespace_var, value="temporal")
+        tipo_tablespace_temporal.grid(row=3, column=1, padx=10, pady=5, sticky="w")
+
+        def on_submit():
+            nombre_tablespace = nombre_tablespace_entry.get()
+            nuevo_tamano = nuevo_tamano_entry.get()
+            tipo_tablespace = tipo_tablespace_var.get()
+
+            if nombre_tablespace and nuevo_tamano:
+                try:
+                    # Asegúrate de que 'controlador' esté correctamente inicializado
+                    if self.controlador.crear_tablespace(nombre_tablespace, nuevo_tamano, tipo_tablespace):
+                        messagebox.showinfo("Éxito", f"Tablespace '{nombre_tablespace}' creado correctamente.")
+                        dialog.destroy()  # Cerrar el diálogo
+                    else:
+                        messagebox.showerror("Error", "No se pudo crear el tablespace.")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Ocurrió un error: {str(e)}")
+            else:
+                messagebox.showwarning("Advertencia", "Por favor complete ambos campos.")
+
+        def on_cancel():
+            dialog.destroy()
+
+        submit_button = tk.Button(dialog, text="Crear Tablespace", command=on_submit, font=("Tahoma", 10))
+        submit_button.grid(row=4, column=0, columnspan=2, padx=(10, 5), pady=10)
+
+        cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, width=12, font=("Tahoma", 10))
+        cancel_button.grid(row=4, column=1, padx=(5, 10), pady=10)
+
+        dialog.transient(self.root) 
+        dialog.grab_set()
+
 
     def drop_tablespace(self):
         nombre_tablespace = simpledialog.askstring("Eliminar Tablespace", "Ingrese el nombre del tablespace a eliminar:")
