@@ -275,7 +275,7 @@ class Controlador:
                 query = f"ANALYZE TABLE {usuario}.{tabla} COMPUTE STATISTICS"
                 cursor.execute(query)
             self.conector.commit()
-            tk.messagebox.showinfo("Éxito", "Estadística realizada con éxito!")
+            print("Estadística realizada con éxito!")
             return True
         except cx_Oracle.Error as e:
             print(f"Error al generar estadísticas: {e}")
@@ -760,7 +760,7 @@ class OracleDBManager:
     def __init__(self, root):
         self.root = root
         self.root.title("Administrador de Base de Datos Oracle")
-        self.root.geometry("800x600")
+        self.root.geometry("880x600")
         
         self.controlador = Controlador()
         
@@ -784,10 +784,10 @@ class OracleDBManager:
         style = ttk.Style()
         style.configure("TButton", font=("Tahoma", 10))
 
-        ttk.Button(self.login_frame, text="Conectar", command=self.connect, width=15, style="TButton").grid(row=3, column=0, columnspan=2, pady=15, padx=(15,0))
+        ttk.Button(self.login_frame, text="Conectar", command=self.connect, width=15, style="TButton").grid(row=3, column=0, columnspan=2, pady=15, padx=(18,0))
 
         self.status_label = ttk.Label(self.login_frame, text="Estado: Desconectado", foreground="red", font=("Tahoma", 10))
-        self.status_label.grid(row=4, column=0, columnspan=2, padx=(12,0))
+        self.status_label.grid(row=4, column=0, columnspan=2, padx=(15,0))
 
     def connect(self):
         username = self.username_entry.get()
@@ -822,18 +822,24 @@ class OracleDBManager:
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="Gestión de Usuarios")
 
-        ttk.Button(tab, text="Crear Usuario", command=self.create_user).pack(pady=5)
-        ttk.Button(tab, text="Crear Rol", command=self.create_role).pack(pady=5)
-        ttk.Button(tab, text="Otorgar Rol a Usuario", command=self.grant_role_to_user).pack(pady=5)
-        ttk.Button(tab, text="Revocar Rol de Usuario", command=self.revoke_role_from_user).pack(pady=5)
-        ttk.Button(tab, text="Ver Roles de Usuario", command=self.view_user_roles).pack(pady=5)
+        button_frame = ttk.Frame(tab)
+        button_frame.place(relx=0.5, rely=0.4, anchor="center")
+
+        ttk.Button(button_frame, text="Crear Usuario", command=self.create_user).pack(pady=5)
+        ttk.Button(button_frame, text="Crear Rol", command=self.create_role).pack(pady=5)
+        ttk.Button(button_frame, text="Otorgar Rol a Usuario", command=self.grant_role_to_user).pack(pady=5)
+        ttk.Button(button_frame, text="Revocar Rol de Usuario", command=self.revoke_role_from_user).pack(pady=5)
+        ttk.Button(button_frame, text="Ver Roles de Usuario", command=self.view_user_roles).pack(pady=5)
 
     def create_session_management_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="Gestión de Sesiones")
 
-        ttk.Button(tab, text="Ver Sesiones Activas", command=self.view_active_sessions).pack(pady=5)
-        ttk.Button(tab, text="Terminar Sesión", command=self.kill_session).pack(pady=5)
+        button_frame = ttk.Frame(tab)
+        button_frame.place(relx=0.5, rely=0.4, anchor="center")
+
+        ttk.Button(button_frame, text="Ver Sesiones Activas", command=self.view_active_sessions).pack(pady=5)
+        ttk.Button(button_frame, text="Terminar Sesión", command=self.kill_session).pack(pady=5)
 
     def create_tablespace_management_tab(self):
         tab = ttk.Frame(self.notebook)
@@ -894,20 +900,72 @@ class OracleDBManager:
             messagebox.showerror("Error", "No se pudo crear el rol.")
 
     def grant_role_to_user(self):
-        user = simpledialog.askstring("Otorgar Rol", "Ingrese el nombre de usuario:")
-        role = simpledialog.askstring("Otorgar Rol", "Ingrese el nombre del rol:")
-        if user and role and self.controlador.otorgar_rol_usuario(role, user):
-            messagebox.showinfo("Éxito", f"Rol {role} otorgado al usuario {user}.")
-        else:
-            messagebox.showerror("Error", "No se pudo otorgar el rol.")
+        # Crear ventana emergente personalizada
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Otorgar Rol a Usuario")
+
+        tk.Label(dialog, text="Ingrese el nombre de usuario:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=10)
+        user_entry = tk.Entry(dialog)
+        user_entry.grid(row=0, column=1, padx=10, pady=10)
+
+        tk.Label(dialog, text="Ingrese el nombre del rol:", font=("Tahoma", 10)).grid(row=1, column=0, padx=10, pady=10)
+        role_entry = tk.Entry(dialog)
+        role_entry.grid(row=1, column=1, padx=10, pady=10)
+
+        def on_submit():
+            user = user_entry.get()
+            role = role_entry.get()
+            if user and role and self.controlador.otorgar_rol_usuario(role, user):
+                messagebox.showinfo("Éxito", f"Rol '{role}' otorgado al usuario '{user}'.")
+                dialog.destroy()  # Cerrar el diálogo
+            else:
+                messagebox.showerror("Error", "No se pudo otorgar el rol.")
+
+        def on_cancel():
+            dialog.destroy()
+
+        submit_button = tk.Button(dialog, text="Otorgar Rol", command=on_submit, width=12, font=("Tahoma", 10))
+        submit_button.grid(row=2, column=0, columnspan=2, padx=(10, 5), pady=10)
+
+        cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, width=12, font=("Tahoma", 10))
+        cancel_button.grid(row=2, column=1, padx=(20, 10), pady=10)
+
+        dialog.transient(self.root) 
+        dialog.grab_set()
 
     def revoke_role_from_user(self):
-        user = simpledialog.askstring("Revocar Rol", "Ingrese el nombre de usuario:")
-        role = simpledialog.askstring("Revocar Rol", "Ingrese el nombre del rol:")
-        if user and role and self.controlador.revocar_rol_usuario(role, user):
-            messagebox.showinfo("Éxito", f"Rol {role} revocado del usuario {user}.")
-        else:
-            messagebox.showerror("Error", "No se pudo revocar el rol.")
+        # Crear ventana emergente personalizada
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Revocar Rol de Usuario")
+
+        tk.Label(dialog, text="Ingrese el nombre de usuario:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=10)
+        user_entry = tk.Entry(dialog)
+        user_entry.grid(row=0, column=1, padx=10, pady=10)
+
+        tk.Label(dialog, text="Ingrese el nombre del rol:", font=("Tahoma", 10)).grid(row=1, column=0, padx=10, pady=10)
+        role_entry = tk.Entry(dialog)
+        role_entry.grid(row=1, column=1, padx=10, pady=10)
+
+        def on_submit():
+            user = user_entry.get()
+            role = role_entry.get()
+            if user and role and self.controlador.revocar_rol_usuario(role, user):
+                messagebox.showinfo("Éxito", f"Rol '{role}' revocado del usuario '{user}'.")
+                dialog.destroy()  # Cerrar el diálogo
+            else:
+                messagebox.showerror("Error", "No se pudo revocar el rol.")
+
+        def on_cancel():
+            dialog.destroy()
+
+        submit_button = tk.Button(dialog, text="Revocar Rol", command=on_submit, font=("Tahoma", 10))
+        submit_button.grid(row=2, column=0, columnspan=2, padx=(10, 5), pady=10)
+
+        cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, width=10, font=("Tahoma", 10))
+        cancel_button.grid(row=2, column=1, padx=(5, 10), pady=10)
+
+        dialog.transient(self.root) 
+        dialog.grab_set()
 
     def view_user_roles(self):
         user = simpledialog.askstring("Ver Roles", "Ingrese el nombre de usuario:")
@@ -956,13 +1014,41 @@ class OracleDBManager:
         
 
     def kill_session(self):
-        sid = simpledialog.askstring("Terminar Sesión", "Ingrese SID:")
-        serial = simpledialog.askstring("Terminar Sesión", "Ingrese Serial#:")
-        if sid and serial:
-            if self.controlador.cerrar_sesion_bd(sid, serial, 1):
-                messagebox.showinfo("Éxito", f"Sesión {sid},{serial} terminada exitosamente.")
+        # Crear ventana emergente personalizada
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Terminar Sesión")
+
+        tk.Label(dialog, text="Ingrese SID:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=10)
+        sid_entry = tk.Entry(dialog)
+        sid_entry.grid(row=0, column=1, padx=10, pady=10)
+
+        tk.Label(dialog, text="Ingrese Serial#:", font=("Tahoma", 10)).grid(row=1, column=0, padx=10, pady=10)
+        serial_entry = tk.Entry(dialog)
+        serial_entry.grid(row=1, column=1, padx=10, pady=10)
+
+        def on_submit():
+            sid = sid_entry.get()
+            serial = serial_entry.get()
+            if sid and serial:
+                if self.controlador.cerrar_sesion_bd(sid, serial, 1):
+                    messagebox.showinfo("Éxito", f"Sesión {sid}, {serial} terminada exitosamente.")
+                    dialog.destroy()  # Cerrar el diálogo
+                else:
+                    messagebox.showerror("Error", "No se pudo terminar la sesión.")
             else:
-                messagebox.showerror("Error", "No se pudo terminar la sesión.")
+                messagebox.showwarning("Advertencia", "Por favor complete ambos campos.")
+
+        def on_cancel():
+            dialog.destroy()
+
+        submit_button = tk.Button(dialog, text="Terminar Sesión", command=on_submit, font=("Tahoma", 10))
+        submit_button.grid(row=2, column=0, columnspan=2, padx=(10, 5), pady=10)
+
+        cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, width=10, font=("Tahoma", 10))
+        cancel_button.grid(row=2, column=1, padx=(80, 5), pady=10)
+
+        dialog.transient(self.root) 
+        dialog.grab_set()
 
     # Tablespace Management Methods
     def view_tablespaces(self):
@@ -1089,7 +1175,7 @@ class OracleDBManager:
             dialog.destroy()
 
         submit_button = tk.Button(dialog, text="Cambiar Tamaño", command=on_submit, font=("Tahoma", 10))
-        submit_button.grid(row=2, column=0, columnspan=2, padx=(10,5), pady=10)
+        submit_button.grid(row=2, column=0, columnspan=2, padx=(30,5), pady=10)
 
         cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, width=12, font=("Tahoma", 10))
         cancel_button.grid(row=2, column=1, padx=(5,10), pady=10)
@@ -1178,43 +1264,131 @@ class OracleDBManager:
             messagebox.showinfo("Plan de Ejecución", "No hay plan de ejecución disponible.")
 
     def generate_table_statistics(self):
-        schema = simpledialog.askstring("Generar Estadísticas", "Ingrese el nombre del esquema:")
-        table = simpledialog.askstring("Generar Estadísticas", "Ingrese el nombre de la tabla (o 'Schema' para todas las tablas):")
-        if schema and table:
-            if self.controlador.genera_stats(schema, table):
-                messagebox.showinfo("Éxito", "Estadísticas generadas exitosamente.")
-                stats = self.controlador.consulta_stats(table)  # Obtener los resultados de la consulta
-                if stats:  # Verifica si hay resultados
-                    result_message = "Estadísticas:\n"
-                    for row in stats:  # Iterar sobre los resultados
-                        result_message += f"Propietario: {row[0]}, Nombre de Tabla: {row[1]}, Número de Filas: {row[2]}, Último Análisis: {row[3]}\n"
-                    messagebox.showinfo("Información de Estadísticas", result_message)  # Mostrar estadísticas
+        # Crear ventana emergente para ingresar esquema y tabla
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Generar Estadísticas")
+
+        tk.Label(dialog, text="Ingrese el nombre del esquema:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=10)
+        schema_entry = tk.Entry(dialog)
+        schema_entry.grid(row=0, column=1, padx=10, pady=10)
+
+        tk.Label(dialog, text="Ingrese el nombre de la tabla (o 'Schema' para todas las tablas):", font=("Tahoma", 10)).grid(row=1, column=0, padx=10, pady=10)
+        table_entry = tk.Entry(dialog)
+        table_entry.grid(row=1, column=1, padx=10, pady=10)
+
+        def on_submit():
+            schema = schema_entry.get()
+            table = table_entry.get()
+            if schema and table:
+                if self.controlador.genera_stats(schema, table):
+                    messagebox.showinfo("Éxito", "Estadísticas generadas exitosamente.")
+                    stats = self.controlador.consulta_stats(table) 
+                    if stats:
+                        stats_window = tk.Toplevel(self.root)
+                        stats_window.title("Estadísticas de la Tabla")
+
+                        tree = ttk.Treeview(stats_window, columns=("Propietario", "Nombre de Tabla", "Número de Filas", "Último Análisis"), show="headings")
+                        
+                        tree.heading("Propietario", text="Propietario")
+                        tree.heading("Nombre de Tabla", text="Nombre de Tabla")
+                        tree.heading("Número de Filas", text="Número de Filas")
+                        tree.heading("Último Análisis", text="Último Análisis")
+
+                        tree.column("Propietario", anchor="center")
+                        tree.column("Nombre de Tabla", anchor="center")
+                        tree.column("Número de Filas", anchor="center")
+                        tree.column("Último Análisis", anchor="center")
+
+                        for row in stats:
+                            tree.insert("", tk.END, values=row)
+
+                        tree.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+
+                        close_button = tk.Button(stats_window, text="Cerrar", command=stats_window.destroy, width=12)
+                        close_button.pack(pady=(0, 10))
+                    else:
+                        messagebox.showerror("Error", "No se encontraron estadísticas.")
                 else:
-                    messagebox.showerror("Error", "No se encontraron estadísticas.")
+                    messagebox.showerror("Error", "Error al generar estadísticas.")
             else:
-                messagebox.showerror("Error", "Error al generar estadísticas.")
+                messagebox.showwarning("Advertencia", "Por favor complete ambos campos.")
+
+        def on_cancel():
+            dialog.destroy()
+
+        submit_button = tk.Button(dialog, text="Generar Estadísticas", command=on_submit, font=("Tahoma", 10))
+        submit_button.grid(row=2, column=0, columnspan=2, padx=(130, 0), pady=10)
+
+        cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, width=12, font=("Tahoma", 10))
+        cancel_button.grid(row=2, column=1, padx=(5, 10), pady=10)
 
     # Métodos de Auditoría
     def view_audit_trail(self):
         audit_trail = self.controlador.ver_auditoria_por_accion()
         sesiones = self.controlador.visualizar_auditoria_sesiones()  # Obtener auditoría de sesiones
 
-        trail_text = ""
+        # Crear una nueva ventana para mostrar el historial de auditoría
+        audit_window = tk.Toplevel(self.root)
+        audit_window.title("Registro de Auditoría")
+        audit_window.geometry("900x600")
 
-        # Procesar la auditoría de acciones
+        action_label = tk.Label(audit_window, text="Auditoría por Acciones", font=("Arial", 10))
+        action_label.pack(pady=(10, 0))
+
+        # Crear el Treeview para mostrar la auditoría de acciones
+        action_tree = ttk.Treeview(audit_window, columns=("ID de Sesión", "Userhost", "Usuario", "Acción", "Objeto"), show="headings")
+        action_tree.heading("ID de Sesión", text="ID de Sesión")
+        action_tree.heading("Userhost", text="Userhost")
+        action_tree.heading("Usuario", text="Usuario")
+        action_tree.heading("Acción", text="Acción")
+        action_tree.heading("Objeto", text="Objeto")
+
+        # Configurar el alineamiento de las columnas
+        action_tree.column("ID de Sesión", anchor="center", width=100)
+        action_tree.column("Userhost", anchor="center", width=120)
+        action_tree.column("Usuario", anchor="center", width=120)
+        action_tree.column("Acción", anchor="center", width=100)
+        action_tree.column("Objeto", anchor="center", width=150)
+
+        # Insertar auditoría de acciones
         if audit_trail:
-            trail_text += "\nAcciones:\n" + "\n".join([f"{row[0]} - {row[1]} - {row[2]} - {row[3]} en {row[4]}" for row in audit_trail]) + "\n"
+            for row in audit_trail:
+                action_tree.insert("", tk.END, values=(row[0], row[1], row[2], row[3], row[4]))
         else:
-            trail_text += "No hay auditoría disponible para acciones.\n"
+            action_tree.insert("", tk.END, values=("No hay auditoría disponible para acciones.", "", "", "", ""))
 
-        # Procesar la auditoría de sesiones
+        action_tree.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
+
+        action_label = tk.Label(audit_window, text="Auditoría por Sesiones", font=("Arial", 10))
+        action_label.pack(pady=(10, 0))
+
+        # Crear el Treeview para mostrar la auditoría de sesiones
+        session_tree = ttk.Treeview(audit_window, columns=("Nombre de Usuario", "Estado", "Inicio de Sesión", "Fin de Sesión"), show="headings")
+        session_tree.heading("Nombre de Usuario", text="Nombre de Usuario")
+        session_tree.heading("Estado", text="Estado")
+        session_tree.heading("Inicio de Sesión", text="Inicio de Sesión")
+        session_tree.heading("Fin de Sesión", text="Fin de Sesión")
+
+        # Configurar el alineamiento de las columnas
+        session_tree.column("Nombre de Usuario", anchor="center", width=150)
+        session_tree.column("Estado", anchor="center", width=100)
+        session_tree.column("Inicio de Sesión", anchor="center", width=150)
+        session_tree.column("Fin de Sesión", anchor="center", width=150)
+
+        # Insertar auditoría de sesiones
         if sesiones:
-            trail_text += "Sesiones:\n" + "\n".join([f"{row[0]} - {row[1]} - {row[2]} - {row[3]}" for row in sesiones])
+            for row in sesiones:
+                session_tree.insert("", tk.END, values=(row[0], row[1], row[2], row[3]))
         else:
-            trail_text += "No hay auditoría disponible para sesiones."
+            session_tree.insert("", tk.END, values=("No hay auditoría disponible para sesiones.", "", "", ""))
 
-        # Mostrar mensaje con los resultados combinados
-        messagebox.showinfo("Auditoría", trail_text)
+        session_tree.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
+
+        # Botón para cerrar la ventana
+        close_button = tk.Button(audit_window, text="Cerrar", command=audit_window.destroy, width=12)
+        close_button.pack(pady=10)
+        
+        
 
     # Métodos de Información de la Base de Datos
     def view_instance_info(self):
