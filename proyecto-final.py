@@ -672,6 +672,20 @@ class Controlador:
             print(f"Error al borrar el tablespace: {e}")
             return False
 
+    def redimensionar_tablespace(self, nombre_tablespace, nuevo_tamano):
+        ruta_datafile = f"C:\Archivos Oracle\{nombre_tablespace}.dbf"
+
+        query = f"ALTER DATABASE DATAFILE '{ruta_datafile}' RESIZE {nuevo_tamano}"
+        try:
+            cursor = self.conector.cursor()
+            cursor.execute(query)
+            self.conector.commit()
+            print(f"El tamaño del tablespace '{nombre_tablespace}' ha sido cambiado a {nuevo_tamano}.")
+            return True
+        except cx_Oracle.Error as e:
+            print(f"Error al cambiar el tamaño del tablespace: {e}")
+            return False
+
 class OracleDBManager:
     def __init__(self, root):
         self.root = root
@@ -758,6 +772,8 @@ class OracleDBManager:
         ttk.Button(tab, text="Ver Tablespaces", command=self.view_tablespaces).pack(pady=5)
         ttk.Button(tab, text="Crear Tablespace", command=self.create_tablespace).pack(pady=5)
         ttk.Button(tab, text="Eliminar Tablespace", command=self.drop_tablespace).pack(pady=5)
+        ttk.Button(tab, text="Cambiar Tamaño Tablespace", command=self.resize_tablespace).pack(pady=5)
+    
 
     def create_backup_tab(self):
         tab = ttk.Frame(self.notebook)
@@ -872,6 +888,47 @@ class OracleDBManager:
                 messagebox.showinfo("Éxito", f"Tablespace '{nombre_tablespace}' eliminado correctamente.")
             else:
                 messagebox.showerror("Error", "No se pudo eliminar el tablespace.")
+
+    def resize_tablespace(self):
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Cambiar Tamaño de Tablespace")
+
+        tk.Label(dialog, text="Ingrese el nombre del tablespace:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=10)
+        nombre_tablespace_entry = tk.Entry(dialog)
+        nombre_tablespace_entry.grid(row=0, column=1, padx=10, pady=10)
+
+        tk.Label(dialog, text="Ingrese el nuevo tamaño (ejemplo: 100M):", font=("Tahoma", 10)).grid(row=1, column=0, padx=10, pady=10)
+        nuevo_tamano_entry = tk.Entry(dialog)
+        nuevo_tamano_entry.grid(row=1, column=1, padx=10, pady=10)
+
+        def on_submit():
+            nombre_tablespace = nombre_tablespace_entry.get()
+            nuevo_tamano = nuevo_tamano_entry.get()
+
+            if nombre_tablespace and nuevo_tamano:
+                try:
+                    if self.controlador.redimensionar_tablespace(nombre_tablespace, nuevo_tamano):
+                        messagebox.showinfo("Éxito", f"Tamaño del tablespace '{nombre_tablespace}' cambiado correctamente.")
+                        dialog.destroy()  # Cerrar el diálogo
+                    else:
+                        messagebox.showerror("Error", "No se pudo cambiar el tamaño del tablespace.")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Ocurrió un error: {str(e)}")
+            else:
+                messagebox.showwarning("Advertencia", "Por favor complete ambos campos.")
+        
+        def on_cancel():
+            dialog.destroy()
+
+        submit_button = tk.Button(dialog, text="Cambiar Tamaño", command=on_submit, font=("Tahoma", 10))
+        submit_button.grid(row=2, column=0, columnspan=2, padx=(10,5), pady=10)
+
+        cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, width=12, font=("Tahoma", 10))
+        cancel_button.grid(row=2, column=1, padx=(5,10), pady=10)
+
+        # Para evitar que el usuario cierre el diálogo sin completar la acción
+        dialog.transient(self.root) 
+        dialog.grab_set() 
 
     def backup(self, backup_type):
         try:
