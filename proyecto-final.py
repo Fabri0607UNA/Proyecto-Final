@@ -852,11 +852,38 @@ class OracleDBManager:
     # Session Management Methods
     def view_active_sessions(self):
         sessions = self.controlador.cargar_sesiones_bd()
+        
+        # Crear una nueva ventana para mostrar las sesiones activas
         if sessions:
-            session_list = "\n".join([f"SID: {row[0]}, Serial#: {row[1]}, Usuario: {row[2]}, Programa: {row[3]}" for row in sessions])
-            messagebox.showinfo("Sesiones Activas", session_list)
+            # Crear una ventana nueva
+            sessions_window = tk.Toplevel(self.root)
+            sessions_window.title("Sesiones Activas")
+            sessions_window.geometry("500x300")
+
+            # Crear el Treeview para mostrar las sesiones
+            tree = ttk.Treeview(sessions_window, columns=("SID", "Serial#", "Usuario", "Programa"), show="headings")
+            tree.heading("SID", text="SID")
+            tree.heading("Serial#", text="Serial#")
+            tree.heading("Usuario", text="Usuario")
+            tree.heading("Programa", text="Programa")
+            tree.column("SID", anchor="center", width=100)
+            tree.column("Serial#", anchor="center", width=100)
+            tree.column("Usuario", anchor="center",width=150)
+            tree.column("Programa", anchor="center",width=150)
+
+            # Insertar las sesiones en el Treeview
+            for row in sessions:
+                tree.insert("", tk.END, values=row)
+
+            tree.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
+
+            # Botón para cerrar la ventana
+            close_button = tk.Button(sessions_window, text="Cerrar", command=sessions_window.destroy, width=12)
+            close_button.pack(pady=10)
+
         else:
             messagebox.showinfo("Sesiones Activas", "No se encontraron sesiones activas")
+        
 
     def kill_session(self):
         sid = simpledialog.askstring("Terminar Sesión", "Ingrese SID:")
@@ -870,9 +897,31 @@ class OracleDBManager:
     # Tablespace Management Methods
     def view_tablespaces(self):
         tablespaces = self.controlador.tam_tablespaces()
+        
         if tablespaces:
-            ts_list = "\n".join([f"{row[0]}: {row[2]}MB total, {row[3]}MB usados, {row[4]}MB libres" for row in tablespaces])
-            messagebox.showinfo("Tablespaces", ts_list)
+            # Crear una nueva ventana emergente para mostrar la tabla
+            dialog = tk.Toplevel(self.root)
+            dialog.title("Tablespaces")
+
+            dialog.geometry("500x300")
+
+            tree = ttk.Treeview(dialog, columns=("Nombre", "Tamaño Total", "Usado", "Libre"), show="headings")
+            tree.heading("Nombre", text="Nombre")
+            tree.heading("Tamaño Total", text="Tamaño Total (MB)")
+            tree.heading("Usado", text="Usado (MB)")
+            tree.heading("Libre", text="Libre (MB)")
+
+            tree.column("Nombre", anchor="center", width=150)
+            tree.column("Tamaño Total", anchor="center", width=100)
+            tree.column("Usado", anchor="center", width=100)
+            tree.column("Libre", anchor="center", width=100)
+
+            for row in tablespaces:
+                tree.insert("", "end", values=(row[0], row[2], row[3], row[4]))
+
+            tree.pack(expand=True, fill="both")
+
+            tk.Button(dialog, text="Cerrar", command=dialog.destroy, width=12).pack(pady=10)
         else:
             messagebox.showinfo("Tablespaces", "No se encontraron tablespaces")
 
@@ -1071,29 +1120,51 @@ class OracleDBManager:
         temp_files = self.controlador.temp_files()
         # Obtener archivos de redo log
         redo_log_files = self.controlador.redo_log_files()
-    
-        # Preparar texto para mostrar
-        file_text = "Archivos de Datos:\n"
+
+        # Crear una nueva ventana para mostrar los archivos
+        files_window = tk.Toplevel(self.root)
+        files_window.title("Archivos del Sistema")
+        files_window.geometry("600x400")
+
+        # Crear el Treeview para mostrar los archivos
+        tree = ttk.Treeview(files_window, columns=("Tipo", "Ruta"), show="headings")
+        tree.heading("Tipo", text="Tipo")
+        tree.heading("Ruta", text="Ruta de Archivo")
+
+        # Configurar el alineamiento de las columnas
+        tree.column("Tipo", anchor="center", width=100)
+        tree.column("Ruta", anchor="center", width=400)
+
+        # Insertar archivos de datos
         if data_files:
-            file_text += "\n".join([f"{row[0]}: {row[1]}" for row in data_files]) + "\n"
+            for row in data_files:
+                # Suponiendo que la ruta está en la segunda columna de `data_files`
+                tree.insert("", tk.END, values=("Archivo de Datos", row[1]))  # row[1] debe contener la ruta completa
         else:
-            file_text += "No se encontraron archivos de datos.\n"
+            tree.insert("", tk.END, values=("No se encontraron archivos de datos.", ""))
 
-        file_text += "\nArchivos Temporales:\n"
+        # Insertar archivos temporales
         if temp_files:
-            file_text += "\n".join([f"{row[0]}: {row[1]}" for row in temp_files]) + "\n"
+            for row in temp_files:
+                # Suponiendo que la ruta está en la segunda columna de `temp_files`
+                tree.insert("", tk.END, values=("Archivo Temporal", row[1]))  # row[1] debe contener la ruta completa
         else:
-            file_text += "No se encontraron archivos temporales.\n"
+            tree.insert("", tk.END, values=("No se encontraron archivos temporales.", ""))
 
-        file_text += "\nArchivos de Redo Log:\n"
+        # Insertar archivos de redo log
         if redo_log_files:
-            file_text += "\n".join([f"{row[0]}" for row in redo_log_files]) + "\n"
+            for row in redo_log_files:
+                # Suponiendo que la ruta está en la primera columna de `redo_log_files`
+                tree.insert("", tk.END, values=("Archivo de Redo Log", row[0]))  # row[0] debe contener la ruta completa
         else:
-            file_text += "No se encontraron archivos de redo log.\n"
+            tree.insert("", tk.END, values=("No se encontraron archivos de redo log.", ""))
 
-        # Mostrar el mensaje combinado
-        messagebox.showinfo("Archivos del Sistema", file_text)
+        tree.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
 
+        # Botón para cerrar la ventana
+        close_button = tk.Button(files_window, text="Cerrar", command=files_window.destroy, width=12)
+        close_button.pack(pady=10)
+       
     def disconnect(self):
         # Cerrar la conexión y volver a la pantalla de inicio de sesión
         self.controlador.conector.close()
