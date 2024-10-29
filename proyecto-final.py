@@ -534,12 +534,19 @@ class Controlador:
         try:
             cursor = self.conector.cursor()
             cursor.execute("ALTER SESSION SET \"_ORACLE_SCRIPT\"=TRUE")
-            cursor.execute(f"CREATE USER {usuario}")
+
+            # Solicitar la contraseña del usuario
+            contrasena = input("Ingrese la contraseña para el nuevo usuario: ")
+
+            # Crear el usuario con la contraseña
+            cursor.execute(f"CREATE USER {usuario} IDENTIFIED BY {contrasena}")
             self.conector.commit()
+            print(f"Usuario '{usuario}' creado exitosamente.")
             return True
         except cx_Oracle.Error as e:
             print(f"Error al crear usuario: {e}")
             return False
+
 
     def cargar_roles(self, usuario):
         query = f"SELECT GRANTED_ROLE FROM DBA_ROLE_PRIVS WHERE GRANTEE='{usuario}'"
@@ -1156,8 +1163,78 @@ class OracleDBManager:
             messagebox.showerror("Error", f"Ocurrió un error: {e}")
 
     def restore_backup(self):
-        # Este método requeriría implementación adicional para restaurar respaldos
-        messagebox.showinfo("Info", "Restauración de respaldo no implementada en esta versión.")
+        # Crear un diálogo para seleccionar el tipo de restauración
+        restore_type = simpledialog.askstring(
+            "Restauración de respaldo", 
+            "Ingrese el tipo de restauración: 'TABLAS', 'ESQUEMA', o 'COMPLETO'"
+        )
+        if restore_type is None:
+            return  # Salir si el usuario cancela
+
+        restore_type = restore_type.strip().upper()
+
+        if restore_type == 'TABLAS':
+            self.restore_tables()
+        elif restore_type == 'ESQUEMA':
+            self.restore_schema()
+        elif restore_type == 'COMPLETO':
+            self.restore_full()
+        else:
+            messagebox.showerror("Error", "Tipo de restauración no válido.")
+
+    def restore_tables(self):
+        table_name = simpledialog.askstring("Tabla", "Ingrese el nombre completo de la tabla (esquema.tabla):")
+        dumpfile = simpledialog.askstring("Archivo de respaldo", "Ingrese el nombre del archivo de respaldo (DMP):")
+        logfile = simpledialog.askstring("Archivo de log", "Ingrese el nombre del archivo de log:")
+        directory = "RESPALDO"  # Directorio por defecto
+        if not all([table_name, dumpfile]):
+            messagebox.showerror("Error", "Todos los campos son requeridos.")
+            return
+
+        # Construir el comando IMPDP
+        command = f"IMPDP 'sys/root@XE as sysdba' TABLES={table_name} DIRECTORY={directory} DUMPFILE={dumpfile} LOGFILE={logfile}"
+        self.execute_restore_command(command)
+
+    def restore_schema(self):
+        schema_name = simpledialog.askstring("Esquema", "Ingrese el nombre del esquema:")
+        dumpfile = simpledialog.askstring("Archivo de respaldo", "Ingrese el nombre del archivo de respaldo (DMP):")
+        logfile = simpledialog.askstring("Archivo de log", "Ingrese el nombre del archivo de log:")
+        directory = "RESPALDO"  # Directorio por defecto
+        if not all([schema_name, dumpfile, logfile]):
+            messagebox.showerror("Error", "Todos los campos son requeridos.")
+            return
+
+        # Construir el comando IMPDP
+        command = (
+            f"IMPDP 'sys/root@XE as sysdba' SCHEMAS={schema_name} "
+            f"DIRECTORY={directory} DUMPFILE={dumpfile} LOGFILE={logfile}"
+        )
+        self.execute_restore_command(command)
+
+    def restore_full(self):
+        dumpfile = simpledialog.askstring("Archivo de respaldo", "Ingrese el nombre del archivo de respaldo (DMP):")
+        logfile = simpledialog.askstring("Archivo de log", "Ingrese el nombre del archivo de log:")
+        directory = "RESPALDO"  # Directorio por defecto
+        if not all([dumpfile, logfile]):
+            messagebox.showerror("Error", "Todos los campos son requeridos.")
+            return
+
+        # Construir el comando IMPDP
+        command = (
+            f"IMPDP 'sys/root@XE as sysdba' FULL=Y "
+            f"DIRECTORY={directory} DUMPFILE={dumpfile} LOGFILE={logfile}"
+        )
+        self.execute_restore_command(command)
+
+    def execute_restore_command(self, command):
+        try:
+            result = subprocess.run(command, shell=True, capture_output=True, text=True)
+            if result.returncode == 0:
+                messagebox.showinfo("Éxito", "Restauración completada correctamente.")
+            else:
+                messagebox.showerror("Error", f"Error en la restauración:\n{result.stderr}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al ejecutar la restauración:\n{e}")
 
     # Métodos de Optimización de Consultas
     def analyze_query(self):
