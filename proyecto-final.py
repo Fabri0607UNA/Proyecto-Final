@@ -845,59 +845,117 @@ class OracleDBManager:
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="Gestión de Tablespaces")
 
-        ttk.Button(tab, text="Ver Tablespaces", command=self.view_tablespaces).pack(pady=5)
-        ttk.Button(tab, text="Crear Tablespace", command=self.crear_tablespace).pack(pady=5)
-        ttk.Button(tab, text="Eliminar Tablespace", command=self.drop_tablespace).pack(pady=5)
-        ttk.Button(tab, text="Cambiar Tamaño Tablespace", command=self.resize_tablespace).pack(pady=5)
+        button_frame = ttk.Frame(tab)
+        button_frame.place(relx=0.5, rely=0.4, anchor="center")
+
+        ttk.Button(button_frame, text="Ver Tablespaces", command=self.view_tablespaces).pack(pady=5)
+        ttk.Button(button_frame, text="Crear Tablespace", command=self.crear_tablespace).pack(pady=5)
+        ttk.Button(button_frame, text="Eliminar Tablespace", command=self.drop_tablespace).pack(pady=5)
+        ttk.Button(button_frame, text="Cambiar Tamaño Tablespace", command=self.resize_tablespace).pack(pady=5)
     
 
     def create_backup_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="Respaldo y Recuperación")
 
-        ttk.Button(tab, text="Respaldo de Esquema", command=lambda: self.backup("schema")).pack(pady=5)
-        ttk.Button(tab, text="Respaldo de Tabla", command=lambda: self.backup("table")).pack(pady=5)
-        ttk.Button(tab, text="Respaldo Completo", command=lambda: self.backup("full")).pack(pady=5)
-        ttk.Button(tab, text="Restaurar Respaldo", command=self.restore_backup).pack(pady=5)
+        button_frame = ttk.Frame(tab)
+        button_frame.place(relx=0.5, rely=0.4, anchor="center")
+
+        ttk.Button(button_frame, text="Respaldo de Esquema", command=lambda: self.backup("schema")).pack(pady=5)
+        ttk.Button(button_frame, text="Respaldo de Tabla", command=lambda: self.backup("table")).pack(pady=5)
+        ttk.Button(button_frame, text="Respaldo Completo", command=lambda: self.backup("full")).pack(pady=5)
+        ttk.Button(button_frame, text="Restaurar Respaldo", command=self.restore_backup).pack(pady=5)
         
     def create_query_optimization_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="Optimización de Consultas")
 
-        ttk.Button(tab, text="Analizar Consulta", command=self.analyze_query).pack(pady=5)
-        ttk.Button(tab, text="Ver Plan de Ejecución", command=self.view_execution_plan).pack(pady=5)
-        ttk.Button(tab, text="Generar Estadísticas de Tabla", command=self.generate_table_statistics).pack(pady=5)
+        button_frame = ttk.Frame(tab)
+        button_frame.place(relx=0.5, rely=0.4, anchor="center")
+
+        ttk.Button(button_frame, text="Analizar Consulta", command=self.analyze_query).pack(pady=5)
+        ttk.Button(button_frame, text="Ver Plan de Ejecución", command=self.view_execution_plan).pack(pady=5)
+        ttk.Button(button_frame, text="Generar Estadísticas de Tabla", command=self.generate_table_statistics).pack(pady=5)
 
     def create_auditing_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="Auditoría")
 
-        ttk.Button(tab, text="Habilitar Auditoría de Conexiones", command=self.controlador.auditar_conexiones).pack(pady=5)
-        ttk.Button(tab, text="Habilitar Auditoría de Sesiones", command=self.controlador.auditar_inicios_sesion).pack(pady=5)
-        ttk.Button(tab, text="Ver Registro de Auditoría", command=self.view_audit_trail).pack(pady=5)
+        button_frame = ttk.Frame(tab)
+        button_frame.place(relx=0.5, rely=0.4, anchor="center")
+
+        ttk.Button(button_frame, text="Habilitar Auditoría de Conexiones", command=self.controlador.auditar_conexiones).pack(pady=5)
+        ttk.Button(button_frame, text="Habilitar Auditoría de Sesiones", command=self.controlador.auditar_inicios_sesion).pack(pady=5)
+        ttk.Button(button_frame, text="Ver Registro de Auditoría", command=self.view_audit_trail).pack(pady=5)
 
     def create_database_info_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="Información de la Base de Datos")
 
-        ttk.Button(tab, text="Ver Información de la Instancia", command=self.view_instance_info).pack(pady=5)
-        ttk.Button(tab, text="Ver Tamaño de la Base de Datos", command=self.view_database_size).pack(pady=5)
-        ttk.Button(tab, text="Ver Archivos de Datos", command=self.view_data_files).pack(pady=5)
+        button_frame = ttk.Frame(tab)
+        button_frame.place(relx=0.5, rely=0.4, anchor="center")
+
+        ttk.Button(button_frame, text="Ver Información de la Instancia", command=self.view_instance_info).pack(pady=5)
+        ttk.Button(button_frame, text="Ver Tamaño de la Base de Datos", command=self.view_database_size).pack(pady=5)
+        ttk.Button(button_frame, text="Ver Archivos de Datos", command=self.view_data_files).pack(pady=5)
 
     # User Management Methods
     def create_user(self):
-        username = simpledialog.askstring("Crear Usuario", "Ingrese el nuevo nombre de usuario:")
-        if username and self.controlador.crear_usuario(username):
-            messagebox.showinfo("Éxito", f"Usuario {username} creado exitosamente.")
-        else:
-            messagebox.showerror("Error", "No se pudo crear el usuario.")
+        # Crear ventana Toplevel
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Crear Usuario")
+
+        tk.Label(dialog, text="Ingrese el nuevo nombre de usuario:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=10)
+        username_entry = tk.Entry(dialog)
+        username_entry.grid(row=0, column=1, padx=10, pady=10)
+
+        def on_accept():
+            username = username_entry.get()
+            if username:
+                if self.controlador.crear_usuario(username):
+                    messagebox.showinfo("Éxito", f"Usuario {username} creado exitosamente.")
+                else:
+                    messagebox.showerror("Error", "No se pudo crear el usuario.")
+            else:
+                messagebox.showwarning("Advertencia", "El campo de usuario no puede estar vacío.")
+
+        def on_cancel():
+            dialog.destroy()
+
+        # Botones Aceptar y Cancelar
+        accept_button = tk.Button(dialog, text="Crear Usuario", command=on_accept, font=("Tahoma", 10), width=12)
+        accept_button.grid(row=1, column=0, padx=(170, 0), pady=10)
+
+        cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, font=("Tahoma", 10), width=12)
+        cancel_button.grid(row=1, column=1, padx=(5, 15), pady=10)
 
     def create_role(self):
-        role = simpledialog.askstring("Crear Rol", "Ingrese el nuevo nombre del rol:")
-        if role and self.controlador.crear_rol(role):
-            messagebox.showinfo("Éxito", f"Rol {role} creado exitosamente.")
-        else:
-            messagebox.showerror("Error", "No se pudo crear el rol.")
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Crear Rol")
+
+        tk.Label(dialog, text="Ingrese el nuevo nombre del rol:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=10)
+        role_entry = tk.Entry(dialog)
+        role_entry.grid(row=0, column=1, padx=10, pady=10)
+
+        def on_accept():
+            role = role_entry.get()
+            if role:
+                if self.controlador.crear_rol(role):
+                    messagebox.showinfo("Éxito", f"Rol {role} creado exitosamente.")
+                else:
+                    messagebox.showerror("Error", "No se pudo crear el rol o ya existe.")
+            else:
+                messagebox.showwarning("Advertencia", "El campo de rol no puede estar vacío.")
+
+        def on_cancel():
+            dialog.destroy()
+
+        # Botones Aceptar y Cancelar
+        accept_button = tk.Button(dialog, text="Crear Rol", command=on_accept, font=("Tahoma", 10), width=12)
+        accept_button.grid(row=1, column=0, padx=(170, 0), pady=10)
+
+        cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, font=("Tahoma", 10), width=12)
+        cancel_button.grid(row=1, column=1, padx=(5, 15), pady=10)
 
     def grant_role_to_user(self):
         # Crear ventana emergente personalizada
@@ -968,14 +1026,35 @@ class OracleDBManager:
         dialog.grab_set()
 
     def view_user_roles(self):
-        user = simpledialog.askstring("Ver Roles", "Ingrese el nombre de usuario:")
-        if user:
-            roles = self.controlador.cargar_roles(user)
-            if roles:
-                role_list = "\n".join([row[0] for row in roles])
-                messagebox.showinfo("Roles del Usuario", f"Roles para {user}:\n{role_list}")
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Ver Roles de Usuario")
+
+        tk.Label(dialog, text="Ingrese el nombre de usuario:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=10)
+        user_entry = tk.Entry(dialog)
+        user_entry.grid(row=0, column=1, padx=10, pady=10)
+
+        def on_accept():
+            user = user_entry.get()
+            if user:
+                roles = self.controlador.cargar_roles(user)
+                if roles:
+                    role_list = "\n".join([row[0] for row in roles])
+                    messagebox.showinfo("Roles del Usuario", f"Roles para {user}:\n{role_list}")
+                else:
+                    messagebox.showinfo("Roles del Usuario", f"No se encontraron roles para {user}")
             else:
-                messagebox.showinfo("Roles del Usuario", f"No se encontraron roles para {user}")
+                messagebox.showwarning("Advertencia", "El campo de usuario no puede estar vacío.")
+
+        def on_cancel():
+            dialog.destroy()
+
+        # Botones Aceptar y Cancelar
+        accept_button = tk.Button(dialog, text="Aceptar", command=on_accept, font=("Tahoma", 10), width=12)
+        accept_button.grid(row=1, column=0, padx=(170, 0), pady=10)
+
+        cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, font=("Tahoma", 10), width=12)
+        cancel_button.grid(row=1, column=1, padx=(5, 15), pady=10)
+        
 
     # Session Management Methods
     def view_active_sessions(self):
@@ -1032,7 +1111,6 @@ class OracleDBManager:
             if sid and serial:
                 if self.controlador.cerrar_sesion_bd(sid, serial, 1):
                     messagebox.showinfo("Éxito", f"Sesión {sid}, {serial} terminada exitosamente.")
-                    dialog.destroy()  # Cerrar el diálogo
                 else:
                     messagebox.showerror("Error", "No se pudo terminar la sesión.")
             else:
@@ -1110,10 +1188,9 @@ class OracleDBManager:
 
             if nombre_tablespace and nuevo_tamano:
                 try:
-                    # Asegúrate de que 'controlador' esté correctamente inicializado
                     if self.controlador.crear_tablespace(nombre_tablespace, nuevo_tamano, tipo_tablespace):
                         messagebox.showinfo("Éxito", f"Tablespace '{nombre_tablespace}' creado correctamente.")
-                        dialog.destroy()  # Cerrar el diálogo
+                        dialog.destroy()
                     else:
                         messagebox.showerror("Error", "No se pudo crear el tablespace.")
                 except Exception as e:
@@ -1135,13 +1212,32 @@ class OracleDBManager:
 
 
     def drop_tablespace(self):
-        nombre_tablespace = simpledialog.askstring("Eliminar Tablespace", "Ingrese el nombre del tablespace a eliminar:")
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Eliminar Tablespace")
 
-        if nombre_tablespace:
-            if self.controlador.borrar_tablespace(nombre_tablespace):
-                messagebox.showinfo("Éxito", f"Tablespace '{nombre_tablespace}' eliminado correctamente.")
+        tk.Label(dialog, text="Ingrese el nombre del tablespace a eliminar:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=10)
+        tablespace_entry = tk.Entry(dialog)
+        tablespace_entry.grid(row=0, column=1, padx=10, pady=10)
+
+        def on_accept():
+            nombre_tablespace = tablespace_entry.get()
+            if nombre_tablespace:
+                if self.controlador.borrar_tablespace(nombre_tablespace):
+                    messagebox.showinfo("Éxito", f"Tablespace '{nombre_tablespace}' eliminado correctamente.")
+                    dialog.destroy()  # Cierra la ventana después de eliminar el tablespace
+                else:
+                    messagebox.showerror("Error", "No se pudo eliminar el tablespace.")
             else:
-                messagebox.showerror("Error", "No se pudo eliminar el tablespace.")
+                messagebox.showwarning("Advertencia", "El campo de nombre de tablespace no puede estar vacío.")
+
+        def on_cancel():
+            dialog.destroy()
+
+        accept_button = tk.Button(dialog, text="Aceptar", command=on_accept, font=("Tahoma", 10), width=12)
+        accept_button.grid(row=1, column=0, padx=(170, 0), pady=10)
+
+        cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, font=("Tahoma", 10), width=12)
+        cancel_button.grid(row=1, column=1, padx=(5, 15), pady=10)
 
     def resize_tablespace(self):
         dialog = tk.Toplevel(self.root)
