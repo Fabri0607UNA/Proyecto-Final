@@ -536,7 +536,7 @@ class Controlador:
             cursor.execute("ALTER SESSION SET \"_ORACLE_SCRIPT\"=TRUE")
 
             # Solicitar la contraseña del usuario
-            contrasena = input("Ingrese la contraseña para el nuevo usuario: ")
+            contrasena = simpledialog.askstring("Crear Usuario", "Ingrese la contraseña para el nuevo usuario: ")
 
             # Crear el usuario con la contraseña
             cursor.execute(f"CREATE USER {usuario} IDENTIFIED BY {contrasena}")
