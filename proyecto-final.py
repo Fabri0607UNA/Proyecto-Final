@@ -1498,14 +1498,33 @@ class OracleDBManager:
 
     # Métodos de Optimización de Consultas
     def analyze_query(self):
-        query = simpledialog.askstring("Analizar Consulta", "Ingrese la consulta SQL:")
-        if query:
-            result = self.controlador.executar_query_optimizar(query)
-            if result == "true":
-                messagebox.showinfo("Éxito", "Consulta analizada exitosamente.")
-                dialog.destroy()
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Analizar Consulta")
+        
+        tk.Label(dialog, text="Ingrese la consulta SQL:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=5)
+        query_entry = tk.Entry(dialog)
+        query_entry.grid(row=0, column=1, padx=10, pady=5)
+
+        def on_accept():
+            query = query_entry.get()
+            if query:
+                result = self.controlador.executar_query_optimizar(query)
+                if result == "true":
+                    messagebox.showinfo("Éxito", "Consulta analizada exitosamente.")
+                    dialog.destroy()
+                else:
+                    messagebox.showerror("Error", f"Error al analizar la consulta: {result}")
             else:
-                messagebox.showerror("Error", f"Error al analizar la consulta: {result}")
+                messagebox.showerror("Error", "La consulta SQL es requerida.")
+
+        def on_cancel():
+            dialog.destroy()
+
+        accept_button = tk.Button(dialog, text="Analizar", command=on_accept, font=("Tahoma", 10), width=12)
+        accept_button.grid(row=1, column=0, padx=(130, 5), pady=10)
+
+        cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, font=("Tahoma", 10), width=12)
+        cancel_button.grid(row=1, column=1, padx=(0, 10), pady=10)
 
     def view_execution_plan(self):
         plan = self.controlador.obtener_explain_plan()
