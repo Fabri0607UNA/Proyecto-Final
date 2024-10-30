@@ -1515,7 +1515,7 @@ class OracleDBManager:
 
         # Botones para Restaurar y Cancelar
         restore_button = tk.Button(dialog, text="Restaurar", command=on_restore, font=("Tahoma", 10), width=12)
-        restore_button.grid(row=3, column=0, padx=(5, 5), pady=10)
+        restore_button.grid(row=3, column=0, padx=(120, 5), pady=10)
 
         cancel_button = tk.Button(dialog, text="Cancelar", command=dialog.destroy, font=("Tahoma", 10), width=12)
         cancel_button.grid(row=3, column=1, padx=(5, 10), pady=10)
@@ -1563,7 +1563,7 @@ class OracleDBManager:
 
         # Botones para Restaurar y Cancelar
         restore_button = tk.Button(dialog, text="Restaurar", command=on_restore, font=("Tahoma", 10), width=12)
-        restore_button.grid(row=3, column=0, padx=(5, 5), pady=10)
+        restore_button.grid(row=3, column=0, padx=(120, 5), pady=10)
 
         cancel_button = tk.Button(dialog, text="Cancelar", command=dialog.destroy, font=("Tahoma", 10), width=12)
         cancel_button.grid(row=3, column=1, padx=(5, 10), pady=10)
@@ -1605,7 +1605,7 @@ class OracleDBManager:
 
         # Botones para Restaurar y Cancelar
         restore_button = tk.Button(dialog, text="Restaurar", command=on_restore, font=("Tahoma", 10), width=12)
-        restore_button.grid(row=2, column=0, padx=(5, 5), pady=10)
+        restore_button.grid(row=2, column=0, padx=(120, 5), pady=10)
         cancel_button = tk.Button(dialog, text="Cancelar", command=dialog.destroy, font=("Tahoma", 10), width=12)
         cancel_button.grid(row=2, column=1, padx=(5, 10), pady=10)
 
