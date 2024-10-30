@@ -530,13 +530,10 @@ class Controlador:
             print(f"Error al crear rol: {e}")
             return False
 
-    def crear_usuario(self, usuario):
+    def crear_usuario(self, usuario, contrasena):
         try:
             cursor = self.conector.cursor()
             cursor.execute("ALTER SESSION SET \"_ORACLE_SCRIPT\"=TRUE")
-
-            # Solicitar la contraseña del usuario
-            contrasena = simpledialog.askstring("Crear Usuario", "Ingrese la contraseña para el nuevo usuario: ")
 
             # Crear el usuario con la contraseña
             cursor.execute(f"CREATE USER {usuario} IDENTIFIED BY {contrasena}")
@@ -859,8 +856,9 @@ class OracleDBManager:
         ttk.Button(button_frame, text="Crear Tablespace", command=self.crear_tablespace).pack(pady=5)
         ttk.Button(button_frame, text="Eliminar Tablespace", command=self.drop_tablespace).pack(pady=5)
         ttk.Button(button_frame, text="Cambiar Tamaño Tablespace", command=self.resize_tablespace).pack(pady=5)
+        ttk.Button(button_frame, text="Crear Indice", command=self.create_index).pack(pady=5)
+        ttk.Button(button_frame, text="Eliminar Indice", command=self.drop_index).pack(pady=5)
     
-
     def create_backup_tab(self):
         tab = ttk.Frame(self.notebook)
         self.notebook.add(tab, text="Respaldo y Recuperación")
@@ -891,8 +889,8 @@ class OracleDBManager:
         button_frame = ttk.Frame(tab)
         button_frame.place(relx=0.5, rely=0.4, anchor="center")
 
-        ttk.Button(button_frame, text="Habilitar Auditoría de Conexiones", command=self.controlador.auditar_conexiones).pack(pady=5)
-        ttk.Button(button_frame, text="Habilitar Auditoría de Sesiones", command=self.controlador.auditar_inicios_sesion).pack(pady=5)
+        ttk.Button(button_frame, text="Habilitar Auditoría de Conexiones", command=self.habilitar_auditoria_conexiones).pack(pady=5)
+        ttk.Button(button_frame, text="Habilitar Auditoría de Sesiones", command=self.habilitar_auditoria_sesiones).pack(pady=5)
         ttk.Button(button_frame, text="Ver Registro de Auditoría", command=self.view_audit_trail).pack(pady=5)
 
     def create_database_info_tab(self):
@@ -916,11 +914,17 @@ class OracleDBManager:
         username_entry = tk.Entry(dialog)
         username_entry.grid(row=0, column=1, padx=10, pady=10)
 
+        tk.Label(dialog, text="Ingrese la contraseña para el usuario:", font=("Tahoma", 10)).grid(row=1, column=0, padx=10, pady=10)
+        password_entry = tk.Entry(dialog, show="*")
+        password_entry.grid(row=1, column=1, padx=10, pady=10)
+
         def on_accept():
             username = username_entry.get()
-            if username:
-                if self.controlador.crear_usuario(username):
+            password = password_entry.get()
+            if username and password:
+                if self.controlador.crear_usuario(username, password):
                     messagebox.showinfo("Éxito", f"Usuario {username} creado exitosamente.")
+                    dialog.destroy() 
                 else:
                     messagebox.showerror("Error", "No se pudo crear el usuario.")
             else:
@@ -928,13 +932,12 @@ class OracleDBManager:
 
         def on_cancel():
             dialog.destroy()
-
-        # Botones Aceptar y Cancelar
+        
         accept_button = tk.Button(dialog, text="Crear Usuario", command=on_accept, font=("Tahoma", 10), width=12)
-        accept_button.grid(row=1, column=0, padx=(170, 0), pady=10)
+        accept_button.grid(row=2, column=0, padx=(170, 0), pady=10)
 
         cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, font=("Tahoma", 10), width=12)
-        cancel_button.grid(row=1, column=1, padx=(5, 15), pady=10)
+        cancel_button.grid(row=2, column=1, padx=(5, 15), pady=10)
 
     def create_role(self):
         dialog = tk.Toplevel(self.root)
@@ -949,6 +952,7 @@ class OracleDBManager:
             if role:
                 if self.controlador.crear_rol(role):
                     messagebox.showinfo("Éxito", f"Rol {role} creado exitosamente.")
+                    dialog.destroy()
                 else:
                     messagebox.showerror("Error", "No se pudo crear el rol o ya existe.")
             else:
@@ -982,7 +986,7 @@ class OracleDBManager:
             role = role_entry.get()
             if user and role and self.controlador.otorgar_rol_usuario(role, user):
                 messagebox.showinfo("Éxito", f"Rol '{role}' otorgado al usuario '{user}'.")
-                dialog.destroy()  # Cerrar el diálogo
+                dialog.destroy()
             else:
                 messagebox.showerror("Error", "No se pudo otorgar el rol.")
 
@@ -1016,7 +1020,7 @@ class OracleDBManager:
             role = role_entry.get()
             if user and role and self.controlador.revocar_rol_usuario(role, user):
                 messagebox.showinfo("Éxito", f"Rol '{role}' revocado del usuario '{user}'.")
-                dialog.destroy()  # Cerrar el diálogo
+                dialog.destroy()
             else:
                 messagebox.showerror("Error", "No se pudo revocar el rol.")
 
@@ -1118,6 +1122,7 @@ class OracleDBManager:
             if sid and serial:
                 if self.controlador.cerrar_sesion_bd(sid, serial, 1):
                     messagebox.showinfo("Éxito", f"Sesión {sid}, {serial} terminada exitosamente.")
+                    dialog.destroy()
                 else:
                     messagebox.showerror("Error", "No se pudo terminar la sesión.")
             else:
@@ -1231,7 +1236,7 @@ class OracleDBManager:
             if nombre_tablespace:
                 if self.controlador.borrar_tablespace(nombre_tablespace):
                     messagebox.showinfo("Éxito", f"Tablespace '{nombre_tablespace}' eliminado correctamente.")
-                    dialog.destroy()  # Cierra la ventana después de eliminar el tablespace
+                    dialog.destroy()
                 else:
                     messagebox.showerror("Error", "No se pudo eliminar el tablespace.")
             else:
@@ -1266,7 +1271,7 @@ class OracleDBManager:
                 try:
                     if self.controlador.redimensionar_tablespace(nombre_tablespace, nuevo_tamano):
                         messagebox.showinfo("Éxito", f"Tamaño del tablespace '{nombre_tablespace}' cambiado correctamente.")
-                        dialog.destroy()  # Cerrar el diálogo
+                        dialog.destroy() 
                     else:
                         messagebox.showerror("Error", "No se pudo cambiar el tamaño del tablespace.")
                 except Exception as e:
@@ -1287,6 +1292,79 @@ class OracleDBManager:
         dialog.transient(self.root) 
         dialog.grab_set() 
 
+    def create_index(self):
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Crear Índice")
+
+        tk.Label(dialog, text="Ingrese el nombre del esquema:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=5)
+        schema_entry = tk.Entry(dialog)
+        schema_entry.grid(row=0, column=1, padx=10, pady=5)
+
+        tk.Label(dialog, text="Ingrese el nombre de la tabla:", font=("Tahoma", 10)).grid(row=1, column=0, padx=10, pady=5)
+        table_entry = tk.Entry(dialog)
+        table_entry.grid(row=1, column=1, padx=10, pady=5)
+
+        tk.Label(dialog, text="Ingrese el nombre de la columna:", font=("Tahoma", 10)).grid(row=2, column=0, padx=10, pady=5)
+        column_entry = tk.Entry(dialog)
+        column_entry.grid(row=2, column=1, padx=10, pady=5)
+
+        tk.Label(dialog, text="Ingrese el nombre del indice:", font=("Tahoma", 10)).grid(row=3, column=0, padx=10, pady=5)
+        index_name_entry = tk.Entry(dialog)
+        index_name_entry.grid(row=3, column=1, padx=10, pady=5)
+
+        def on_accept():
+            schema = schema_entry.get()
+            table = table_entry.get()
+            column = column_entry.get()
+            index_name = index_name_entry.get()
+
+            if schema and table and column and index_name:
+                if self.controlador.crear_indice(schema, table, column, index_name):
+                    messagebox.showinfo("Éxito", f"Índice '{index_name}' creado exitosamente en {schema}.{table}({column}).")
+                    dialog.destroy()
+                else:
+                    messagebox.showerror("Error", "No se pudo crear el índice.")
+            else:
+                messagebox.showwarning("Advertencia", "Todos los campos son obligatorios.")
+
+        def on_cancel():
+            dialog.destroy()
+
+        accept_button = tk.Button(dialog, text="Crear", command=on_accept, font=("Tahoma", 10), width=12)
+        accept_button.grid(row=4, column=0, padx=(130, 0), pady=10)
+
+        cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, font=("Tahoma", 10), width=12)
+        cancel_button.grid(row=4, column=1, padx=(0, 10), pady=10)
+
+    def drop_index(self):
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Eliminar Índice")
+
+        tk.Label(dialog, text="Nombre del indice a eliminar:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=10)
+        index_name_entry = tk.Entry(dialog)
+        index_name_entry.grid(row=0, column=1, padx=10, pady=10)
+
+        def on_accept():
+            index_name = index_name_entry.get()
+            if index_name:
+                if self.controlador.eliminar_indice(index_name):
+                    messagebox.showinfo("Éxito", f"Índice '{index_name}' eliminado exitosamente.")
+                    dialog.destroy()
+                else:
+                    messagebox.showerror("Error", "No se pudo eliminar el índice.")
+            else:
+                messagebox.showwarning("Advertencia", "El campo de nombre del índice no puede estar vacío.")
+
+        def on_cancel():
+            dialog.destroy()
+
+        accept_button = tk.Button(dialog, text="Eliminar", command=on_accept, font=("Tahoma", 10), width=12)
+        accept_button.grid(row=1, column=0, padx=(130, 5), pady=10)
+
+        cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, font=("Tahoma", 10), width=12)
+        cancel_button.grid(row=1, column=1, padx=(0, 10), pady=10)
+
+    #Respaldos y Recuperacion Metodos
     def backup(self, backup_type):
         try:
             if backup_type == "schema":
@@ -1425,6 +1503,7 @@ class OracleDBManager:
             result = self.controlador.executar_query_optimizar(query)
             if result == "true":
                 messagebox.showinfo("Éxito", "Consulta analizada exitosamente.")
+                dialog.destroy()
             else:
                 messagebox.showerror("Error", f"Error al analizar la consulta: {result}")
 
@@ -1560,9 +1639,20 @@ class OracleDBManager:
         # Botón para cerrar la ventana
         close_button = tk.Button(audit_window, text="Cerrar", command=audit_window.destroy, width=12)
         close_button.pack(pady=10)
-        
-        
+    
 
+    def habilitar_auditoria_conexiones(self):
+        if self.controlador.auditar_conexiones():
+            messagebox.showinfo("Auditoría de Conexiones", "La auditoría de conexiones se ha habilitado exitosamente.")
+        else:
+            messagebox.showerror("Error", "No se pudo habilitar la auditoría de conexiones.")
+
+    def habilitar_auditoria_sesiones(self):
+        if self.controlador.auditar_inicios_sesion():
+            messagebox.showinfo("Auditoría de Sesiones", "La auditoría de sesiones se ha habilitado exitosamente.")
+        else:
+            messagebox.showerror("Error", "No se pudo habilitar la auditoría de inicios de sesión.")
+        
     # Métodos de Información de la Base de Datos
     def view_instance_info(self):
         info = self.controlador.info_instancia()
