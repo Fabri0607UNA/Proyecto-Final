@@ -1366,61 +1366,94 @@ class OracleDBManager:
 
     #Respaldos y Recuperacion Metodos
     def backup(self, backup_type):
-        try:
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Respaldo de Base de Datos")
+
+        tk.Label(dialog, text="Esquema:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=5)
+        schema_entry = tk.Entry(dialog)
+        schema_entry.grid(row=0, column=1, padx=10, pady=5)
+
+        table_label = tk.Label(dialog, text="Tabla:", font=("Tahoma", 10))
+        table_entry = tk.Entry(dialog)
+
+        if backup_type == "schema":
+            table_label.grid_remove()  # Ocultar la etiqueta de tabla
+            table_entry.grid_remove()   # Ocultar el campo de entrada de tabla
+        elif backup_type == "table":
+            table_label.grid(row=1, column=0, padx=10, pady=5)  # Mostrar la etiqueta de tabla
+            table_entry.grid(row=1, column=1, padx=10, pady=5)   # Mostrar el campo de entrada de tabla
+        elif backup_type == "full":
+            table_label.grid_remove()  # Ocultar la etiqueta de tabla
+            table_entry.grid_remove()   # Ocultar el campo de entrada de tabla
+
+        def on_accept():
+            schema = schema_entry.get()
+            table = table_entry.get()
+            dumpfile, logfile = "", ""
+            
             if backup_type == "schema":
-                schema = simpledialog.askstring("Respaldo de Esquema", "Ingrese el nombre del esquema:")
-                dumpfile = f'{schema}_respaldo.dmp'
-                logfile = f'{schema}_respaldo.log'
-                if schema:
-                    result = f"expdp 'sys/root@XE as sysdba' schemas={schema} directory=respaldo dumpfile={dumpfile} logfile={logfile}"
-                else:
+                if not schema:
                     messagebox.showerror("Error", "El nombre del esquema es requerido.")
                     return
+                dumpfile = f'{schema}_respaldo.dmp'
+                logfile = f'{schema}_respaldo.log'
+                result = f"expdp 'sys/root@XE as sysdba' schemas={schema} directory=RESPALDOS dumpfile={dumpfile} logfile={logfile}"
+
             elif backup_type == "table":
-                schema = simpledialog.askstring("Respaldo de Tabla", "Ingrese el nombre del esquema:")
-                table = simpledialog.askstring("Respaldo de Tabla", "Ingrese el nombre de la tabla:")
-                dumpfile = f'{schema}.{table}_respaldo.dmp'
-                logfile = f'{schema}.{table}_respaldo.log'
-                if schema and table:
-                    result = f"expdp 'sys/root@XE as sysdba' tables={schema}.{table} directory=respaldo dumpfile={dumpfile} logfile={logfile}"
-                else:
+                if not schema or not table:
                     messagebox.showerror("Error", "Los nombres del esquema y la tabla son requeridos.")
                     return
+                dumpfile = f'{schema}.{table}_respaldo.dmp'
+                logfile = f'{schema}.{table}_respaldo.log'
+                result = f"expdp 'sys/root@XE as sysdba' tables={schema}.{table} directory=RESPALDOS dumpfile={dumpfile} logfile={logfile}"
+
             elif backup_type == "full":
-                result = f"expdp 'sys/root@XE as sysdba' full=y directory=respaldo dumpfile={dumpfile} logfile={logfile}"
+                dumpfile = 'full_respaldo.dmp'
+                logfile = 'full_respaldo.log'
+                result = f"expdp 'sys/root@XE as sysdba' full=y directory=RESPALDOS dumpfile={dumpfile} logfile={logfile}"
 
-            # Crear una ventana nueva para mostrar la salida
-            output_window = tk.Toplevel(self.root)
-            output_window.title("Salida del Respaldo")
-            output_text = scrolledtext.ScrolledText(output_window, width=80, height=20)
-            output_text.pack(padx=10, pady=10)
+            dialog.destroy()
+            self.show_output_window(result, dumpfile, logfile, backup_type)
 
-            # Función para leer la salida del proceso en tiempo real
-            def run_backup():
-                process = subprocess.Popen(result, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                for line in iter(process.stdout.readline, ''):
-                    output_text.insert(tk.END, line)
-                    output_text.see(tk.END)  # Scroll hacia el final
-                process.stdout.close()
-                
-                # Mostrar cualquier mensaje de error
-                error_output = process.stderr.read()
-                if error_output:
-                    output_text.insert(tk.END, f"\nError:\n{error_output}")
-                process.stderr.close()
-                process.wait()  # Asegurarse de que el proceso haya terminado
+        def on_cancel():
+            dialog.destroy()
 
-                # Verificar si el proceso terminó sin errores
-                if process.returncode == 0:
-                    messagebox.showinfo("Respaldo completo", f"Respaldo {backup_type} realizado correctamente en {dumpfile}")
-                else:
-                    messagebox.showerror("Error", f"Error al realizar el respaldo:\n{error_output}")
+        accept_button = tk.Button(dialog, text="Aceptar", command=on_accept, font=("Tahoma", 10), width=12)
+        accept_button.grid(row=2, column=0, padx=(50, 0), pady=10)
 
-            # Ejecutar el respaldo en un hilo separado para no bloquear la GUI
-            threading.Thread(target=run_backup).start()
+        cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, font=("Tahoma", 10), width=12)
+        cancel_button.grid(row=2, column=1, padx=(0, 5), pady=10)
 
-        except Exception as e:
-            messagebox.showerror("Error", f"Ocurrió un error: {e}")
+    def show_output_window(self, result, dumpfile, logfile, backup_type):
+        # Crear una ventana nueva para mostrar la salida del comando de respaldo
+        output_window = tk.Toplevel(self.root)
+        output_window.title("Salida del Respaldo")
+        output_text = scrolledtext.ScrolledText(output_window, width=80, height=20)
+        output_text.pack(padx=10, pady=10)
+
+        # Función para ejecutar el comando y actualizar la salida
+        def run_backup():
+            process = subprocess.Popen(result, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            for line in iter(process.stdout.readline, ''):
+                output_text.insert(tk.END, line)
+                output_text.see(tk.END)
+            process.stdout.close()
+            
+            # Mostrar mensajes de error si los hay
+            error_output = process.stderr.read()
+            if error_output:
+                output_text.insert(tk.END, f"\nError:\n{error_output}")
+            process.stderr.close()
+            process.wait()
+
+            # Confirmar el resultado final del proceso
+            if process.returncode == 0:
+                messagebox.showinfo("Respaldo completo", f"Respaldo {backup_type} realizado correctamente en {dumpfile}")
+            else:
+                messagebox.showerror("Error", f"Error al realizar el respaldo:\n{error_output}")
+
+        # Ejecutar el respaldo en un hilo separado
+        threading.Thread(target=run_backup).start()
 
     def restore_backup(self):
         # Crear un diálogo para seleccionar el tipo de restauración
@@ -1443,48 +1476,138 @@ class OracleDBManager:
             messagebox.showerror("Error", "Tipo de restauración no válido.")
 
     def restore_tables(self):
-        table_name = simpledialog.askstring("Tabla", "Ingrese el nombre completo de la tabla (esquema.tabla):")
-        dumpfile = simpledialog.askstring("Archivo de respaldo", "Ingrese el nombre del archivo de respaldo (DMP):")
-        logfile = simpledialog.askstring("Archivo de log", "Ingrese el nombre del archivo de log:")
-        directory = "RESPALDO"  # Directorio por defecto
-        if not all([table_name, dumpfile]):
-            messagebox.showerror("Error", "Todos los campos son requeridos.")
-            return
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Restaurar Tablas")
 
-        # Construir el comando IMPDP
-        command = f"IMPDP 'sys/root@XE as sysdba' TABLES={table_name} DIRECTORY={directory} DUMPFILE={dumpfile} LOGFILE={logfile}"
-        self.execute_restore_command(command)
+        # Campo de entrada para el nombre de la tabla
+        tk.Label(dialog, text="Tabla (esquema.tabla):", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=5)
+        table_entry = tk.Entry(dialog)
+        table_entry.grid(row=0, column=1, padx=10, pady=5)
+
+        # Campo de entrada para el archivo de respaldo
+        tk.Label(dialog, text="Archivo de respaldo (DMP):", font=("Tahoma", 10)).grid(row=1, column=0, padx=10, pady=5)
+        dumpfile_entry = tk.Entry(dialog)
+        dumpfile_entry.grid(row=1, column=1, padx=10, pady=5)
+
+        # Campo de entrada para el archivo de log
+        tk.Label(dialog, text="Archivo de log:", font=("Tahoma", 10)).grid(row=2, column=0, padx=10, pady=5)
+        logfile_entry = tk.Entry(dialog)
+        logfile_entry.grid(row=2, column=1, padx=10, pady=5)
+
+        # Función que se ejecuta al presionar "Restaurar"
+        def on_restore():
+            table_name = table_entry.get()
+            dumpfile = dumpfile_entry.get()
+            logfile = logfile_entry.get()
+            directory = "RESPALDO"  # Directorio por defecto
+            
+            # Validar que los campos requeridos estén completos
+            if not all([table_name, dumpfile]):
+                messagebox.showerror("Error", "Todos los campos son requeridos.")
+                return
+
+            # Construir el comando IMPDP
+            command = f"IMPDP 'sys/root@XE as sysdba' TABLES={table_name} DIRECTORY={directory} DUMPFILE={dumpfile} LOGFILE={logfile}"
+            
+            # Cerrar el diálogo y ejecutar el comando
+            dialog.destroy()
+            self.execute_restore_command(command)
+
+        # Botones para Restaurar y Cancelar
+        restore_button = tk.Button(dialog, text="Restaurar", command=on_restore, font=("Tahoma", 10), width=12)
+        restore_button.grid(row=3, column=0, padx=(5, 5), pady=10)
+
+        cancel_button = tk.Button(dialog, text="Cancelar", command=dialog.destroy, font=("Tahoma", 10), width=12)
+        cancel_button.grid(row=3, column=1, padx=(5, 10), pady=10)
 
     def restore_schema(self):
-        schema_name = simpledialog.askstring("Esquema", "Ingrese el nombre del esquema:")
-        dumpfile = simpledialog.askstring("Archivo de respaldo", "Ingrese el nombre del archivo de respaldo (DMP):")
-        logfile = simpledialog.askstring("Archivo de log", "Ingrese el nombre del archivo de log:")
-        directory = "RESPALDO"  # Directorio por defecto
-        if not all([schema_name, dumpfile, logfile]):
-            messagebox.showerror("Error", "Todos los campos son requeridos.")
-            return
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Restaurar Esquema")
 
-        # Construir el comando IMPDP
-        command = (
-            f"IMPDP 'sys/root@XE as sysdba' SCHEMAS={schema_name} "
-            f"DIRECTORY={directory} DUMPFILE={dumpfile} LOGFILE={logfile}"
-        )
-        self.execute_restore_command(command)
+        # Campo de entrada para el nombre del esquema
+        tk.Label(dialog, text="Esquema:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=5)
+        schema_entry = tk.Entry(dialog)
+        schema_entry.grid(row=0, column=1, padx=10, pady=5)
+
+        # Campo de entrada para el archivo de respaldo
+        tk.Label(dialog, text="Archivo de respaldo (DMP):", font=("Tahoma", 10)).grid(row=1, column=0, padx=10, pady=5)
+        dumpfile_entry = tk.Entry(dialog)
+        dumpfile_entry.grid(row=1, column=1, padx=10, pady=5)
+
+        # Campo de entrada para el archivo de log
+        tk.Label(dialog, text="Archivo de log:", font=("Tahoma", 10)).grid(row=2, column=0, padx=10, pady=5)
+        logfile_entry = tk.Entry(dialog)
+        logfile_entry.grid(row=2, column=1, padx=10, pady=5)
+
+        # Función que se ejecuta al presionar "Restaurar"
+        def on_restore():
+            schema_name = schema_entry.get()
+            dumpfile = dumpfile_entry.get()
+            logfile = logfile_entry.get()
+            directory = "RESPALDO"  # Directorio por defecto
+            
+            # Validar que los campos requeridos estén completos
+            if not all([schema_name, dumpfile, logfile]):
+                messagebox.showerror("Error", "Todos los campos son requeridos.")
+                return
+
+            # Construir el comando IMPDP
+            command = (
+                f"IMPDP 'sys/root@XE as sysdba' SCHEMAS={schema_name} "
+                f"DIRECTORY={directory} DUMPFILE={dumpfile} LOGFILE={logfile}"
+            )
+            
+            # Cerrar el diálogo y ejecutar el comando
+            dialog.destroy()
+            self.execute_restore_command(command)
+
+        # Botones para Restaurar y Cancelar
+        restore_button = tk.Button(dialog, text="Restaurar", command=on_restore, font=("Tahoma", 10), width=12)
+        restore_button.grid(row=3, column=0, padx=(5, 5), pady=10)
+
+        cancel_button = tk.Button(dialog, text="Cancelar", command=dialog.destroy, font=("Tahoma", 10), width=12)
+        cancel_button.grid(row=3, column=1, padx=(5, 10), pady=10)
 
     def restore_full(self):
-        dumpfile = simpledialog.askstring("Archivo de respaldo", "Ingrese el nombre del archivo de respaldo (DMP):")
-        logfile = simpledialog.askstring("Archivo de log", "Ingrese el nombre del archivo de log:")
-        directory = "RESPALDO"  # Directorio por defecto
-        if not all([dumpfile, logfile]):
-            messagebox.showerror("Error", "Todos los campos son requeridos.")
-            return
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Restaurar Respaldo Completo")
 
-        # Construir el comando IMPDP
-        command = (
-            f"IMPDP 'sys/root@XE as sysdba' FULL=Y "
-            f"DIRECTORY={directory} DUMPFILE={dumpfile} LOGFILE={logfile}"
-        )
-        self.execute_restore_command(command)
+        # Campo de entrada para el archivo de respaldo
+        tk.Label(dialog, text="Archivo de respaldo (DMP):", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=5)
+        dumpfile_entry = tk.Entry(dialog)
+        dumpfile_entry.grid(row=0, column=1, padx=10, pady=5)
+
+        # Campo de entrada para el archivo de log
+        tk.Label(dialog, text="Archivo de log:", font=("Tahoma", 10)).grid(row=1, column=0, padx=10, pady=5)
+        logfile_entry = tk.Entry(dialog)
+        logfile_entry.grid(row=1, column=1, padx=10, pady=5)
+
+        # Función que se ejecuta al presionar "Restaurar"
+        def on_restore():
+            dumpfile = dumpfile_entry.get()
+            logfile = logfile_entry.get()
+            directory = "RESPALDO"  # Directorio por defecto
+            
+            # Validar que los campos requeridos estén completos
+            if not all([dumpfile, logfile]):
+                messagebox.showerror("Error", "Todos los campos son requeridos.")
+                return
+
+            # Construir el comando IMPDP
+            command = (
+                f"IMPDP 'sys/root@XE as sysdba' FULL=Y "
+                f"DIRECTORY={directory} DUMPFILE={dumpfile} LOGFILE={logfile}"
+            )
+            
+            # Cerrar el diálogo y ejecutar el comando
+            dialog.destroy()
+            self.execute_restore_command(command)
+
+        # Botones para Restaurar y Cancelar
+        restore_button = tk.Button(dialog, text="Restaurar", command=on_restore, font=("Tahoma", 10), width=12)
+        restore_button.grid(row=2, column=0, padx=(5, 5), pady=10)
+        cancel_button = tk.Button(dialog, text="Cancelar", command=dialog.destroy, font=("Tahoma", 10), width=12)
+        cancel_button.grid(row=2, column=1, padx=(5, 10), pady=10)
 
     def execute_restore_command(self, command):
         try:
