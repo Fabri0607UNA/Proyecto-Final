@@ -785,10 +785,22 @@ class OracleDBManager:
         self.password_entry = ttk.Entry(self.login_frame, show="*")
         self.password_entry.grid(row=2, column=1, padx=5, pady=5)
 
-        style = ttk.Style()
-        style.configure("TButton", font=("Tahoma", 10))
-
-        ttk.Button(self.login_frame, text="Conectar", command=self.connect, width=15, style="TButton").grid(row=3, column=0, columnspan=2, pady=15, padx=(18,0))
+        connect_button = tk.Button(
+        self.login_frame,
+        text="Conectar",
+        command=self.connect,
+        bg="#4CAF50",
+        fg="white",
+        activebackground="#45a049",
+        activeforeground="white",    
+        font=("Tahoma", 10, "bold"), 
+        width=10,
+        padx=8,
+        pady=3,
+        relief="raised", 
+        cursor="hand2"
+        )
+        connect_button.grid(row=3, column=0, columnspan=2, pady=15, padx=(18,0))
 
         self.status_label = ttk.Label(self.login_frame, text="Estado: Desconectado", foreground="red", font=("Tahoma", 10))
         self.status_label.grid(row=4, column=0, columnspan=2, padx=(15,0))
@@ -820,7 +832,22 @@ class OracleDBManager:
         self.create_auditing_tab()
         self.create_database_info_tab()
 
-        ttk.Button(self.root, text="Desconectar", command=self.disconnect).pack(pady=10)
+        disconnect_button = tk.Button(
+        self.root,
+        text="Desconectar",
+        command=self.disconnect,
+        bg="#FF3939",
+        fg="white",
+        activebackground="#D32F2F",
+        activeforeground="white",
+        font=('Arial', 10, 'bold'),
+        width=10,
+        padx=8,
+        pady=3,
+        relief="raised",
+        cursor="hand2"
+        )
+        disconnect_button.pack(pady=10)
 
     def create_user_management_tab(self):
         tab = ttk.Frame(self.notebook)
