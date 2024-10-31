@@ -296,13 +296,16 @@ class Controlador:
             return None
 
     def info_instancia(self):
-        query = "SELECT * FROM v$instance"
+        query = """
+        SELECT INSTANCE_NUMBER, INSTANCE_NAME, HOST_NAME, VERSION, STATUS, EDITION
+        FROM v$instance
+        """
         try:
             cursor = self.conector.cursor()
             cursor.execute(query)
-            return cursor
+            return cursor.fetchall()
         except cx_Oracle.Error as e:
-            print(f"Error al obtener info de instancia: {e}")
+            print(f"Error al obtener información de la instancia: {e}")
             return None
 
     def nombre_db(self):
@@ -519,16 +522,22 @@ class Controlador:
             print(f"Error al obtener explain plan: {e}")
             return None
 
-    def crear_rol(self, rol):
+    def crear_rol(self, rol, permisos=[]):
         try:
             cursor = self.conector.cursor()
             cursor.execute("ALTER SESSION SET \"_ORACLE_SCRIPT\"=TRUE")
             cursor.execute(f"CREATE ROLE {rol}")
+
+            # Asignación de permisos al rol
+            for permiso in permisos:
+                cursor.execute(f"GRANT {permiso} TO {rol}")
+
             self.conector.commit()
             return True
         except cx_Oracle.Error as e:
-            print(f"Error al crear rol: {e}")
+            print(f"Error al crear rol o asignar permisos: {e}")
             return False
+
 
     def crear_usuario(self, usuario, contrasena):
         try:
@@ -970,15 +979,23 @@ class OracleDBManager:
         dialog = tk.Toplevel(self.root)
         dialog.title("Crear Rol")
 
+        # Entrada para el nombre del rol
         tk.Label(dialog, text="Ingrese el nuevo nombre del rol:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=10)
         role_entry = tk.Entry(dialog)
         role_entry.grid(row=0, column=1, padx=10, pady=10)
 
+        # Entrada para permisos
+        tk.Label(dialog, text="Permisos (separados por comas):", font=("Tahoma", 10)).grid(row=1, column=0, padx=10, pady=10)
+        permisos_entry = tk.Entry(dialog)
+        permisos_entry.grid(row=1, column=1, padx=10, pady=10)
+
         def on_accept():
             role = role_entry.get()
+            permisos = permisos_entry.get().split(',')
+
             if role:
-                if self.controlador.crear_rol(role):
-                    messagebox.showinfo("Éxito", f"Rol {role} creado exitosamente.")
+                if self.controlador.crear_rol(role, [p.strip() for p in permisos if p.strip()]):
+                    messagebox.showinfo("Éxito", f"Rol {role} creado exitosamente con permisos.")
                     dialog.destroy()
                 else:
                     messagebox.showerror("Error", "No se pudo crear el rol o ya existe.")
@@ -990,10 +1007,10 @@ class OracleDBManager:
 
         # Botones Aceptar y Cancelar
         accept_button = tk.Button(dialog, text="Crear Rol", command=on_accept, font=("Tahoma", 10), width=12)
-        accept_button.grid(row=1, column=0, padx=(170, 0), pady=10)
+        accept_button.grid(row=2, column=0, padx=(170, 0), pady=10)
 
         cancel_button = tk.Button(dialog, text="Cancelar", command=on_cancel, font=("Tahoma", 10), width=12)
-        cancel_button.grid(row=1, column=1, padx=(5, 15), pady=10)
+        cancel_button.grid(row=2, column=1, padx=(5, 15), pady=10)
 
     def grant_role_to_user(self):
         # Crear ventana emergente personalizada
@@ -1825,9 +1842,42 @@ class OracleDBManager:
     # Métodos de Información de la Base de Datos
     def view_instance_info(self):
         info = self.controlador.info_instancia()
+
         if info:
-            info_text = "\n".join([f"{row[0]}: {row[1]}" for row in info])
-            messagebox.showinfo("Información de la Instancia", info_text)
+            # Crear una ventana nueva para mostrar la información de la instancia
+            instance_window = tk.Toplevel(self.root)
+            instance_window.title("Información de la Instancia")
+            instance_window.geometry("600x300")
+
+            # Crear el Treeview para mostrar la información
+            tree = ttk.Treeview(instance_window, columns=("Número", "Nombre", "Hostname", "Versión", "Estado", "Edición"), show="headings")
+            
+            # Configurar encabezados
+            tree.heading("Número", text="Número")
+            tree.heading("Nombre", text="Nombre")
+            tree.heading("Hostname", text="Hostname")
+            tree.heading("Versión", text="Versión")
+            tree.heading("Estado", text="Estado")
+            tree.heading("Edición", text="Edición")
+            
+            # Configurar ancho de columnas y alineación
+            tree.column("Número", anchor="center", width=80)
+            tree.column("Nombre", anchor="center", width=100)
+            tree.column("Hostname", anchor="center", width=120)
+            tree.column("Versión", anchor="center", width=80)
+            tree.column("Estado", anchor="center", width=100)
+            tree.column("Edición", anchor="center", width=120)
+            
+            # Insertar la información de la instancia en el Treeview
+            for row in info:
+                tree.insert("", tk.END, values=row)
+
+            tree.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
+
+            # Botón para cerrar la ventana
+            close_button = tk.Button(instance_window, text="Cerrar", command=instance_window.destroy, width=12)
+            close_button.pack(pady=10)
+
         else:
             messagebox.showinfo("Información de la Instancia", "No hay información de la instancia disponible.")
 
