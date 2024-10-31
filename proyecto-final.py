@@ -1393,25 +1393,31 @@ class OracleDBManager:
 
     #Respaldos y Recuperacion Metodos
     def backup(self, backup_type):
+        if backup_type == "full":
+            messagebox.showinfo("Respaldo en Proceso", "El respaldo completo está en proceso.")
+            dumpfile = 'full_respaldo.dmp'
+            logfile = 'full_respaldo.log'
+            result = f"expdp 'sys/root@XE as sysdba' full=y directory=RESPALDOS dumpfile={dumpfile} logfile={logfile}"
+            self.show_output_window(result, dumpfile, logfile, backup_type)
+            return
+
         dialog = tk.Toplevel(self.root)
         dialog.title("Respaldo de Base de Datos")
 
-        tk.Label(dialog, text="Esquema:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=5)
+        schema_label = tk.Label(dialog, text="Esquema:", font=("Tahoma", 10))
         schema_entry = tk.Entry(dialog)
-        schema_entry.grid(row=0, column=1, padx=10, pady=5)
 
         table_label = tk.Label(dialog, text="Tabla:", font=("Tahoma", 10))
         table_entry = tk.Entry(dialog)
 
         if backup_type == "schema":
-            table_label.grid_remove()  # Ocultar la etiqueta de tabla
-            table_entry.grid_remove()   # Ocultar el campo de entrada de tabla
+            schema_label.grid(row=0, column=0, padx=10, pady=5)
+            schema_entry.grid(row=0, column=1, padx=10, pady=5) # Ocultar el campo de entrada de tabla
         elif backup_type == "table":
-            table_label.grid(row=1, column=0, padx=10, pady=5)  # Mostrar la etiqueta de tabla
+            schema_label.grid(row=0, column=0, padx=10, pady=5)
+            schema_entry.grid(row=0, column=1, padx=10, pady=5)
+            table_label.grid(row=1, column=0, padx=10, pady=5)
             table_entry.grid(row=1, column=1, padx=10, pady=5)   # Mostrar el campo de entrada de tabla
-        elif backup_type == "full":
-            table_label.grid_remove()  # Ocultar la etiqueta de tabla
-            table_entry.grid_remove()   # Ocultar el campo de entrada de tabla
 
         def on_accept():
             schema = schema_entry.get()
@@ -1433,11 +1439,6 @@ class OracleDBManager:
                 dumpfile = f'{schema}.{table}_respaldo.dmp'
                 logfile = f'{schema}.{table}_respaldo.log'
                 result = f"expdp 'sys/root@XE as sysdba' tables={schema}.{table} directory=RESPALDOS dumpfile={dumpfile} logfile={logfile}"
-
-            elif backup_type == "full":
-                dumpfile = 'full_respaldo.dmp'
-                logfile = 'full_respaldo.log'
-                result = f"expdp 'sys/root@XE as sysdba' full=y directory=RESPALDOS dumpfile={dumpfile} logfile={logfile}"
 
             dialog.destroy()
             self.show_output_window(result, dumpfile, logfile, backup_type)
