@@ -927,6 +927,7 @@ class OracleDBManager:
 
         ttk.Button(button_frame, text="Habilitar Auditoría de Conexiones", command=self.habilitar_auditoria_conexiones).pack(pady=5)
         ttk.Button(button_frame, text="Habilitar Auditoría de Sesiones", command=self.habilitar_auditoria_sesiones).pack(pady=5)
+        ttk.Button(button_frame, text="Habilitar Auditoría de Acción", command=self.abrir_dialogo_auditoria).pack(pady=5)
         ttk.Button(button_frame, text="Ver Registro de Auditoría", command=self.view_audit_trail).pack(pady=5)
 
     def create_database_info_tab(self):
@@ -1838,6 +1839,30 @@ class OracleDBManager:
             messagebox.showinfo("Auditoría de Sesiones", "La auditoría de sesiones se ha habilitado exitosamente.")
         else:
             messagebox.showerror("Error", "No se pudo habilitar la auditoría de inicios de sesión.")
+    
+    def abrir_dialogo_auditoria(self):
+        # Crear el diálogo para ingresar esquema y tabla
+        dialog = tk.Toplevel(self.ventana)
+        dialog.title("Habilitar Auditoría en Tabla")
+        
+        tk.Label(dialog, text="Ingrese el nombre del esquema:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=10)
+        schema_entry = tk.Entry(dialog)
+        schema_entry.grid(row=0, column=1, padx=10, pady=10)
+        
+        tk.Label(dialog, text="Ingrese el nombre de la tabla (o 'Schema' para todas las tablas):", font=("Tahoma", 10)).grid(row=1, column=0, padx=10, pady=10)
+        table_entry = tk.Entry(dialog)
+        table_entry.grid(row=1, column=1, padx=10, pady=10)
+        
+        # Botón para confirmar la habilitación de la auditoría
+        boton_confirmar = tk.Button(dialog, text="Habilitar Auditoría", command=lambda: self.habilitar_auditoria_tabla(schema_entry.get(), table_entry.get()))
+        boton_confirmar.grid(row=2, column=0, columnspan=2, pady=10)
+
+    def habilitar_auditoria_tabla(self, schema, tabla):
+        # Llamar a la función de auditoría y verificar el resultado
+        if self.auditar_tabla(schema, tabla):
+            messagebox.showinfo("Auditoría de Tabla", f"La auditoría de operaciones en {schema}.{tabla} se ha habilitado exitosamente.")
+        else:
+            messagebox.showerror("Error", f"No se pudo habilitar la auditoría para la tabla {schema}.{tabla}.")
         
     # Métodos de Información de la Base de Datos
     def view_instance_info(self):
