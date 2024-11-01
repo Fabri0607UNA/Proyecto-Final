@@ -1843,7 +1843,7 @@ class OracleDBManager:
     
     def abrir_dialogo_auditoria(self):
         # Crear el diálogo para ingresar esquema y tabla
-        dialog = tk.Toplevel(self.ventana)
+        dialog = tk.Toplevel(self.root)
         dialog.title("Habilitar Auditoría en Tabla")
         
         tk.Label(dialog, text="Ingrese el nombre del esquema:", font=("Tahoma", 10)).grid(row=0, column=0, padx=10, pady=10)
@@ -1860,7 +1860,7 @@ class OracleDBManager:
 
     def habilitar_auditoria_tabla(self, schema, tabla):
         # Llamar a la función de auditoría y verificar el resultado
-        if self.auditar_tabla(schema, tabla):
+        if self.controlador.auditar_tabla(schema, tabla):
             messagebox.showinfo("Auditoría de Tabla", f"La auditoría de operaciones en {schema}.{tabla} se ha habilitado exitosamente.")
         else:
             messagebox.showerror("Error", f"No se pudo habilitar la auditoría para la tabla {schema}.{tabla}.")
